@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Words Left Unsaid</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&family=Lora:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" href="favicon.ico" type="image/x-icon">
+</head>
+
+<body>
+
+<header>
+  <h1>Words Left Unsaid</h1>
+  <p class="intro">Sometimes the words we never say weigh the most. This is a place to release them — to the ones we miss, the ones we love, or even to ourselves. Share your unsent messages, letters, or thoughts. No judgment. Just a space to let them go.</p>
+  <button id="write-message-btn">Write a message</button>
+</header>
+
+<main>
+  <form id="submission-form" class="collapsed">
+    <div class="form-header">
+      <h2>Share Your Words</h2>
+      <button type="button" id="close-form">×</button>
+    </div>
+    <input type="text" id="from" maxlength="50" placeholder="From" required>
+    <input type="text" id="to" maxlength="50" placeholder="To" required>
+    <textarea id="content" maxlength="1000" placeholder="Your message" required></textarea>
+    <input type="email" id="email" maxlength="100" placeholder="Email (optional) get a link to your message">
+    <button type="submit">Send Message</button>
+  </form>
+
+  <div id="success-message"></div>
+
+  <section id="messages-container"></section>
+
+  <div id="loading">Loading...</div>
+
+  <button id="back-to-top">↑ Top</button>
+</main>
+
+<script type="module" src="./supabase.js" defer></script>
+<script type="module" src="./app.js" defer></script>
+
+</body>
+</html>

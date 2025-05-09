@@ -304,6 +304,12 @@ form button[type="submit"]:hover {
   }
 }
 
+.message-card.highlighted {
+  outline: 3px solid #ff4081;
+  background-color: #fff0f5;
+  transition: outline 0.3s ease, background-color 0.3s ease;
+}
+
 footer {
   position: fixed;
   bottom: 0;

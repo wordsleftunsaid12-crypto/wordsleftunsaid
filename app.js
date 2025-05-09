@@ -5,33 +5,26 @@ document.addEventListener('DOMContentLoaded', () => {
     const writeMessageBtn = document.getElementById('write-message-btn');
     const submissionForm = document.getElementById('submission-form');
     const closeFormBtn = document.getElementById('close-form');
-    
-    // Open the form when "Write a message" button is clicked
+
     writeMessageBtn.addEventListener('click', () => {
         submissionForm.classList.remove('collapsed');
-        // Scroll to the form
         submissionForm.scrollIntoView({ behavior: 'smooth' });
     });
-    
-    // Close the form when close button is clicked
+
     closeFormBtn.addEventListener('click', () => {
         submissionForm.classList.add('collapsed');
     });
-    
-    // Display success message properly
+
     const successMessage = document.getElementById('success-message');
-    
-    // Modified form submission handler
+
     submissionForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        
-        // Form field values
+
         const from = document.getElementById('from').value.trim();
         const to = document.getElementById('to').value.trim();
         const content = document.getElementById('content').value.trim();
         const email = document.getElementById('email').value.trim();
 
-        // Ensure all fields are populated before submission
         if (!from || !to || !content) {
             alert('Please fill out all required fields.');
             return;
@@ -42,19 +35,18 @@ document.addEventListener('DOMContentLoaded', () => {
             to, 
             content, 
             email, 
-            approved: false // Assuming 'approved' is a required field for your data structure
+            approved: false
         };
 
         try {
             const { data, error } = await supabase
-                .from('messages') // Ensure 'messages' table exists
+                .from('messages')
                 .insert([submission]);
 
             if (error) {
                 console.error('Error inserting data:', error.message);
                 alert('Failed to send message. Please try again.');
             } else {
-                // Reset the form and show success message
                 submissionForm.reset();
                 successMessage.textContent = '✅ Your message has been received and is pending review!';
                 successMessage.style.display = 'block';
@@ -67,7 +59,6 @@ document.addEventListener('DOMContentLoaded', () => {
             alert('An unexpected error occurred.');
         }
 
-        // Hide the form after successful submission
         submissionForm.classList.add('collapsed');
     });
 
@@ -80,8 +71,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const pageSize = 10;
     let loadingMore = false;
     let noMoreMessages = false;
+    let triedScrollToHash = false;
 
-    // Back to Top Button
     window.addEventListener('scroll', () => {
         if (window.scrollY > 500) {
             backToTopButton.style.display = 'block';
@@ -94,7 +85,6 @@ document.addEventListener('DOMContentLoaded', () => {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     });
 
-    // Fetch Initial Messages
     fetchApprovedMessages();
 
     async function fetchApprovedMessages() {
@@ -103,7 +93,6 @@ document.addEventListener('DOMContentLoaded', () => {
         loadingMore = true;
         loading.style.display = 'block';
 
-        // Show Skeletons while loading
         for (let i = 0; i < 3; i++) {
             const skeleton = document.createElement('div');
             skeleton.className = 'skeleton-card';
@@ -118,8 +107,6 @@ document.addEventListener('DOMContentLoaded', () => {
             .range(start, start + pageSize - 1);
 
         loading.style.display = 'none';
-
-        // Remove Skeletons
         document.querySelectorAll('.skeleton-card').forEach(el => el.remove());
 
         if (error) {
@@ -149,9 +136,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         start += pageSize;
         loadingMore = false;
+
+        if (!triedScrollToHash) {
+            checkAndScrollToHashMessage();
+            if (!document.querySelector(window.location.hash)) {
+                fetchApprovedMessages();
+            }
+            triedScrollToHash = true;
+        }
     }
 
-    // Observe Messages for Scroll Animations
     function observeMessages() {
         const cards = document.querySelectorAll('.message-card:not(.observed)');
 
@@ -173,7 +167,20 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Infinite Scroll Loading
+    function checkAndScrollToHashMessage() {
+        const hash = window.location.hash;
+        if (hash && hash.startsWith('#message-')) {
+            const target = document.querySelector(hash);
+            if (target) {
+                target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                target.classList.add('highlighted');
+                setTimeout(() => {
+                    target.classList.remove('highlighted');
+                }, 3000);
+            }
+        }
+    }
+
     window.addEventListener('scroll', () => {
         if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 100) {
             fetchApprovedMessages();

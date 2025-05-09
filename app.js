@@ -1,7 +1,6 @@
 import { supabase } from './supabase.js';
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Form toggle functionality
     const writeMessageBtn = document.getElementById('write-message-btn');
     const submissionForm = document.getElementById('submission-form');
     const closeFormBtn = document.getElementById('close-form');
@@ -71,7 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const pageSize = 10;
     let loadingMore = false;
     let noMoreMessages = false;
-    let triedScrollToHash = false;
+    let targetMessageId = null; // Store the target message ID
 
     window.addEventListener('scroll', () => {
         if (window.scrollY > 500) {
@@ -85,6 +84,57 @@ document.addEventListener('DOMContentLoaded', () => {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     });
 
+    // Process hash and set target message ID
+    function processHash() {
+        const hash = window.location.hash;
+        
+        if (!hash) {
+            targetMessageId = null;
+            return false;
+        }
+        
+        if (hash.startsWith('#message-')) {
+            // Extract the message ID from the hash
+            targetMessageId = hash.replace('#message-', '');
+            
+            // Check if the target message is already loaded
+            const target = document.querySelector(hash);
+            if (target) {
+                // If already loaded, scroll to it
+                target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                highlightMessage(target);
+                return true; // Found and processed
+            }
+            return false; // Not found yet
+        }
+        
+        return false;
+    }
+
+    function highlightMessage(element) {
+        element.classList.add('highlighted');
+        setTimeout(() => {
+            element.classList.remove('highlighted');
+        }, 3000);
+    }
+
+    // Add hash change event listener
+    window.addEventListener('hashchange', () => {
+        const found = processHash();
+        if (!found && targetMessageId) {
+            // If hash changed to a new message ID and it's not found,
+            // reset and reload all messages
+            start = 0;
+            noMoreMessages = false;
+            messagesContainer.innerHTML = ''; // Clear existing messages
+            fetchApprovedMessages();
+        }
+    });
+
+    // Initial setup - check for hash on page load
+    processHash();
+    
+    // Initial fetch
     fetchApprovedMessages();
 
     async function fetchApprovedMessages() {
@@ -112,12 +162,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (error) {
             console.error('Error fetching approved messages:', error.message);
             loading.textContent = 'Failed to load messages.';
+            loadingMore = false;
             return;
         }
 
         if (data.length === 0) {
             noMoreMessages = true;
             loading.innerHTML = 'No more messages.';
+            loadingMore = false;
             return;
         }
 
@@ -136,13 +188,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
         start += pageSize;
         loadingMore = false;
-
-        if (!triedScrollToHash) {
-            checkAndScrollToHashMessage();
-            if (!document.querySelector(window.location.hash)) {
+        
+        // Check if we need to scroll to a specific message after loading this batch
+        if (targetMessageId) {
+            const targetElement = document.querySelector(`#message-${targetMessageId}`);
+            if (targetElement) {
+                // Found the target message, scroll to it
+                setTimeout(() => {
+                    targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    highlightMessage(targetElement);
+                }, 100); // Small delay to ensure animation works
+            } else if (!noMoreMessages) {
+                // If we didn't find the message and there are more to load, keep loading
                 fetchApprovedMessages();
             }
-            triedScrollToHash = true;
         }
     }
 
@@ -165,20 +224,6 @@ document.addEventListener('DOMContentLoaded', () => {
         cards.forEach(card => {
             observer.observe(card);
         });
-    }
-
-    function checkAndScrollToHashMessage() {
-        const hash = window.location.hash;
-        if (hash && hash.startsWith('#message-')) {
-            const target = document.querySelector(hash);
-            if (target) {
-                target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                target.classList.add('highlighted');
-                setTimeout(() => {
-                    target.classList.remove('highlighted');
-                }, 3000);
-            }
-        }
     }
 
     window.addEventListener('scroll', () => {

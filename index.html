@@ -44,19 +44,27 @@
   
   <!-- Structured Data / JSON-LD -->
   <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "WebSite",
-    "name": "Words Left Unsaid",
-    "url": "https://your-domain.com",
-    "description": "A safe space to release those messages never sent — express yourself anonymously to loved ones, strangers, or yourself.",
-    "potentialAction": {
-      "@type": "SearchAction",
-      "target": "https://your-domain.com/search?q={search_term_string}",
-      "query-input": "required name=search_term_string"
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "Words Left Unsaid",
+      "url": "https://wordsleftunsaid.com",
+      "description": "A safe space to release those messages never sent — express yourself anonymously to loved ones, strangers, or yourself.",
+      "publisher": {
+        "@type": "Words Left Unsaid",
+        "name": "Words Left Unsaid",
+        "logo": {
+          "@type": "ImageObject",
+          "url": "https://wordsleftunsaid.com/og-image.jpg"
+        }
+      },
+      "mainEntity": {
+        "@type": "CreativeWorkSeries",
+        "name": "Unsent Messages Collection",
+        "description": "A collection of unsent messages, letters, and thoughts shared anonymously."
+      }
     }
-  }
-  </script>
+    </script>
 </head>
 
 <body>

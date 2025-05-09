@@ -303,3 +303,16 @@ form button[type="submit"]:hover {
     font-size: 1.1rem;
   }
 }
+
+footer {
+  text-align: center;
+  padding: 1.5rem;
+  margin-top: 2rem;
+  background: #f0e6e0;
+  color: #5e4e47;
+  font-size: 0.9rem;
+}
+
+footer p {
+  margin: 0;
+}

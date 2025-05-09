@@ -1,12 +1,62 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-CPHLT2VM2D"></script>
+  <script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-CPHLT2VM2D');
+  </script>
+
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Words Left Unsaid</title>
+  
+  <!-- Primary Meta Tags -->
+  <title>Words Left Unsaid - Share Your Unspoken Messages</title>
+  <meta name="title" content="Words Left Unsaid - Share Your Unspoken Messages">
+  <meta name="description" content="A safe space to release those messages never sent — express yourself anonymously to loved ones, strangers, or yourself.">
+  <meta name="keywords" content="unsent messages, unspoken words, anonymous letters, emotional release, personal expression">
+  <meta name="author" content="Words Left Unsaid">
+  
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://wordsleftunsaid.com/">
+  <meta property="og:title" content="Words Left Unsaid - Share Your Unspoken Messages">
+  <meta property="og:description" content="A safe space to release those messages never sent — express yourself anonymously to loved ones, strangers, or yourself.">
+  <meta property="og:image" content="https://wordsleftunsaid.com/og-image.jpg">
+  
+  <!-- Twitter -->
+  <meta property="twitter:card" content="summary_large_image">
+  <meta property="twitter:url" content="https://wordsleftunsaid.com/">
+  <meta property="twitter:title" content="Words Left Unsaid - Share Your Unspoken Messages">
+  <meta property="twitter:description" content="A safe space to release those messages never sent — express yourself anonymously to loved ones, strangers, or yourself.">
+  <meta property="twitter:image" content="https://wordsleftunsaid.com/og-image.jpg">
+  
+  <!-- Canonical URL -->
+  <link rel="canonical" href="https://wordsleftunsaid.com/">
+  
+  <!-- Fonts and Stylesheets -->
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&family=Lora:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
   <link rel="icon" href="favicon.ico" type="image/x-icon">
+  
+  <!-- Structured Data / JSON-LD -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "Words Left Unsaid",
+    "url": "https://your-domain.com",
+    "description": "A safe space to release those messages never sent — express yourself anonymously to loved ones, strangers, or yourself.",
+    "potentialAction": {
+      "@type": "SearchAction",
+      "target": "https://your-domain.com/search?q={search_term_string}",
+      "query-input": "required name=search_term_string"
+    }
+  }
+  </script>
 </head>
 
 <body>
@@ -48,8 +98,12 @@
   <button id="back-to-top">↑ Top</button>
 </main>
 
+<footer>
+  <p>&copy; <script>document.write(new Date().getFullYear())</script> Words Left Unsaid. All rights reserved.</p>
+</footer>
+
 <script type="module" src="./supabase.js" defer></script>
 <script type="module" src="./app.js" defer></script>
 
 </body>
-</html>s
+</html>

@@ -310,6 +310,18 @@ form button[type="submit"]:hover {
   transition: outline 0.3s ease, background-color 0.3s ease;
 }
 
+a {
+  color: #9c7a65; /* your signature warm gold */
+  text-decoration: none;
+  transition: color 0.3s ease;
+}
+
+a:hover,
+a:focus {
+  color: #826659; /* a slightly darker, richer gold for hover */
+  text-decoration: underline;
+}
+
 footer {
   position: fixed;
   bottom: 0;

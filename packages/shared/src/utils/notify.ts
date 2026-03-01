@@ -26,7 +26,7 @@ export async function notifyMessageApproved(input: NotifyApprovedInput): Promise
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: 'Words Left Unsaid <noreply@wordsleftunsaid.com>',
+      from: 'Words Left Unsaid <onboarding@resend.dev>',
       to: input.email,
       subject: 'Your words are live now.',
       html: `
@@ -47,6 +47,11 @@ export async function notifyMessageApproved(input: NotifyApprovedInput): Promise
       `,
     }),
   });
+
+  if (!response.ok) {
+    const body = await response.text();
+    console.error(`[notify] Resend error ${response.status}: ${body}`);
+  }
 
   return response.ok;
 }

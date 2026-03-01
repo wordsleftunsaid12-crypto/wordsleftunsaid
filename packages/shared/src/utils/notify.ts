@@ -1,4 +1,4 @@
-/** Email notification for approved messages via Resend. */
+/** Email notification for approved messages via Brevo (free: 300 emails/day). */
 
 import { getEnvSafe } from '../config/env.js';
 
@@ -11,25 +11,26 @@ interface NotifyApprovedInput {
 
 export async function notifyMessageApproved(input: NotifyApprovedInput): Promise<boolean> {
   const env = getEnvSafe();
-  const apiKey = env?.RESEND_API_KEY;
+  const apiKey = env?.BREVO_API_KEY;
+  const senderEmail = env?.BREVO_SENDER_EMAIL;
 
-  if (!apiKey) {
+  if (!apiKey || !senderEmail) {
     return false;
   }
 
   const messageUrl = `${input.siteUrl}/messages/${input.messageId}`;
 
-  const response = await fetch('https://api.resend.com/emails', {
+  const response = await fetch('https://api.brevo.com/v3/smtp/email', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${apiKey}`,
+      'api-key': apiKey,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: 'Words Left Unsaid <onboarding@resend.dev>',
-      to: input.email,
+      sender: { name: 'Words Left Unsaid', email: senderEmail },
+      to: [{ email: input.email }],
       subject: 'Your words are live now.',
-      html: `
+      htmlContent: `
         <div style="font-family: Georgia, serif; max-width: 480px; margin: 0 auto; padding: 40px 20px; color: #2c2c2c;">
           <p style="font-size: 18px; line-height: 1.7; margin-bottom: 24px;">
             Your message to <strong>${escapeHtml(input.to)}</strong> has been approved and is now live.
@@ -50,7 +51,7 @@ export async function notifyMessageApproved(input: NotifyApprovedInput): Promise
 
   if (!response.ok) {
     const body = await response.text();
-    console.error(`[notify] Resend error ${response.status}: ${body}`);
+    console.error(`[notify] Brevo error ${response.status}: ${body}`);
   }
 
   return response.ok;

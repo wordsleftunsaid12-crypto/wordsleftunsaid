@@ -5,7 +5,8 @@ const envSchema = z.object({
   SUPABASE_ANON_KEY: z.string().min(1),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
   ANTHROPIC_API_KEY: z.string().optional(),
-  RESEND_API_KEY: z.string().optional(),
+  BREVO_API_KEY: z.string().optional(),
+  BREVO_SENDER_EMAIL: z.string().email().optional(),
   GA_MEASUREMENT_ID: z.string().optional(),
   // Instagram (Graph API — optional, browser automation is the default)
   INSTAGRAM_ACCESS_TOKEN: z.string().optional(),

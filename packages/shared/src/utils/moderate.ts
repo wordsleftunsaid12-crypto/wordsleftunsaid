@@ -153,6 +153,62 @@ function checkSpamPatterns(text: string): { score: number; reasons: string[] } {
   return { score, reasons };
 }
 
+// --- Quality checks ---
+
+const JUNK_PHRASES = [
+  'test', 'testing', 'test message', 'this is a test', 'just testing',
+  'hello world', 'asdf', 'qwerty', 'lorem ipsum', 'blah blah',
+  'aaa', 'bbb', 'ccc', 'lol', 'haha', 'lmao', 'bruh',
+  'sdkfjh', 'dsfkj', 'fjdsk',
+];
+
+function checkQuality(content: string): { score: number; reasons: string[] } {
+  let score = 0;
+  const reasons: string[] = [];
+  const lower = content.toLowerCase().trim();
+  const words = lower.split(/\s+/);
+
+  // Check for junk/test phrases
+  for (const phrase of JUNK_PHRASES) {
+    if (lower.includes(phrase)) {
+      score += 50;
+      reasons.push(`low-effort: "${phrase}"`);
+      break;
+    }
+  }
+
+  // Too few unique words (e.g., "hi hi hi hi hi hi")
+  const uniqueWords = new Set(words);
+  if (words.length >= 5 && uniqueWords.size / words.length < 0.4) {
+    score += 40;
+    reasons.push('too many repeated words');
+  }
+
+  // Excessive punctuation (more than 5 of the same in a row)
+  if (/[!?]{4,}/.test(content)) {
+    score += 15;
+    reasons.push('excessive punctuation');
+  }
+
+  // No real words — mostly numbers or symbols
+  const letterCount = (content.match(/[a-zA-Z]/g) || []).length;
+  if (content.length > 10 && letterCount / content.length < 0.5) {
+    score += 40;
+    reasons.push('mostly non-letter characters');
+  }
+
+  // Very generic/casual without substance (short + common greeting patterns)
+  if (words.length < 8) {
+    const greetingPattern = /^(hi|hey|hello|yo|sup|what'?s up|how are you|how r u)/i;
+    if (greetingPattern.test(lower)) {
+      score += 30;
+      reasons.push('casual greeting without substance');
+    }
+  }
+
+  return { score, reasons };
+}
+
 // --- Main ---
 
 const REJECT_THRESHOLD = 40;
@@ -168,6 +224,7 @@ export function moderateContent(content: string, from: string, to: string): Mode
     checkBlocklist(fullText, VIOLENCE_WORDS, 'violence'),
     checkUrls(content),
     checkSpamPatterns(content),
+    checkQuality(content),
   ];
 
   for (const check of checks) {

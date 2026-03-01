@@ -52,7 +52,10 @@ if (Astro.request.method === 'POST') {
           const moderation = moderateContent(sanitized.content, sanitized.from, sanitized.to);
 
           if (!moderation.passed) {
-            formError = 'This message can\u2019t be posted. Please keep it respectful.';
+            const isQuality = moderation.reasons.some((r) => r.startsWith('low-effort') || r.startsWith('casual') || r.startsWith('too many repeated') || r.startsWith('mostly non-letter'));
+            formError = isQuality
+              ? 'This space is for words that matter. Take a moment and write something real.'
+              : 'This message can\u2019t be posted. Please keep it respectful.';
           } else {
             const message = await createApprovedMessage(sanitized);
             submitted = true;

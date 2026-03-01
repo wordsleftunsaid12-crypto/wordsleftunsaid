@@ -1,6 +1,7 @@
 [build]
-  command = "npm run build --workspace=packages/shared && npm run build --workspace=packages/website"
-  publish = "packages/website/dist"
+  base = "packages/website"
+  command = "cd ../shared && npm run build && cd ../website && npm run build"
+  publish = "dist"
 
 [[headers]]
   for = "/*"

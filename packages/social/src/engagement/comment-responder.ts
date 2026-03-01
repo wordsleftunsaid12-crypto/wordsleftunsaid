@@ -64,8 +64,8 @@ function createTemplateReplyGenerator(): (
   ];
 
   const questionReplies = [
-    'You can share your own message anonymously at wordsleftunsaid.com',
-    'We\'d love to hear your story — you can submit yours at wordsleftunsaid.com',
+    'You can share your own message anonymously at wordsleftunsaid.netlify.app',
+    'We\'d love to hear your story — you can submit yours at wordsleftunsaid.netlify.app',
   ];
 
   const tagReplies = [

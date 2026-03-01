@@ -1,0 +1,250 @@
+---
+interface Props {
+  id: string;
+  from: string;
+  to: string;
+  content: string;
+  createdAt: string;
+}
+
+const { id, from, to, content, createdAt } = Astro.props;
+
+const date = new Date(createdAt);
+const timeAgo = getTimeAgo(date);
+
+function getTimeAgo(date: Date): string {
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return 'just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays < 30) return `${diffDays}d ago`;
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+---
+
+<a href={`/messages/${id}`} class="card fade-in" id={`msg-${id}`} data-id={id}>
+  <div class="card-glow"></div>
+  <div class="card-accent"></div>
+  <div class="card-body">
+    <div class="card-to">
+      <span class="to-label">To</span>
+      <span class="to-name">{to}</span>
+    </div>
+    <blockquote class="card-content">
+      {content}
+    </blockquote>
+    <div class="card-footer">
+      <span class="card-from">&mdash; {from}</span>
+      <time class="card-time" datetime={date.toISOString()}>{timeAgo}</time>
+    </div>
+  </div>
+</a>
+
+<script>
+  // 3D tilt + glow follow on cards
+  document.querySelectorAll<HTMLElement>('.card').forEach((card) => {
+    const glow = card.querySelector<HTMLElement>('.card-glow');
+
+    card.addEventListener('mousemove', (e) => {
+      const rect = card.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const cx = rect.width / 2;
+      const cy = rect.height / 2;
+
+      const rotateX = ((y - cy) / cy) * -4;
+      const rotateY = ((x - cx) / cx) * 4;
+
+      card.style.transform = `perspective(800px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateY(-6px) scale(1.02)`;
+
+      if (glow) {
+        glow.style.opacity = '1';
+        glow.style.background = `radial-gradient(circle at ${x}px ${y}px, rgba(200, 168, 130, 0.12) 0%, transparent 60%)`;
+      }
+    });
+
+    card.addEventListener('mouseleave', () => {
+      card.style.transform = '';
+      if (glow) {
+        glow.style.opacity = '0';
+      }
+    });
+  });
+</script>
+
+<style>
+  .card {
+    display: block;
+    background: rgba(26, 24, 22, 0.6);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(200, 168, 130, 0.1);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    text-decoration: none;
+    color: inherit;
+    position: relative;
+    box-shadow:
+      0 2px 12px rgba(0, 0, 0, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    transition:
+      opacity 0.8s cubic-bezier(0.25, 0.1, 0.25, 1),
+      filter 0.6s cubic-bezier(0.25, 0.1, 0.25, 1),
+      transform 0.9s cubic-bezier(0.16, 1, 0.3, 1),
+      box-shadow var(--duration-normal) var(--ease-out),
+      border-color var(--duration-normal),
+      background var(--duration-fast);
+    cursor: pointer;
+  }
+
+  :global([data-theme='light']) .card {
+    background: rgba(255, 255, 255, 0.7);
+    border-color: rgba(140, 110, 90, 0.1);
+    box-shadow:
+      0 2px 12px rgba(0, 0, 0, 0.04),
+      inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  }
+
+  .card.visible {
+    transition:
+      opacity 0.8s cubic-bezier(0.25, 0.1, 0.25, 1),
+      filter 0.6s cubic-bezier(0.25, 0.1, 0.25, 1),
+      transform var(--duration-normal) var(--ease-out),
+      box-shadow var(--duration-normal) var(--ease-out),
+      border-color var(--duration-normal),
+      background var(--duration-fast);
+  }
+
+  .card:hover {
+    box-shadow:
+      0 12px 40px rgba(0, 0, 0, 0.3),
+      0 0 60px rgba(200, 168, 130, 0.06),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    background: rgba(32, 30, 27, 0.7);
+    border-color: rgba(200, 168, 130, 0.2);
+    color: inherit;
+  }
+
+  :global([data-theme='light']) .card:hover {
+    box-shadow:
+      0 12px 40px rgba(0, 0, 0, 0.08),
+      0 0 60px rgba(200, 168, 130, 0.04),
+      inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    background: rgba(255, 255, 255, 0.85);
+    border-color: rgba(140, 110, 90, 0.15);
+  }
+
+  .card:focus-visible {
+    outline: 2px solid var(--brand-warm);
+    outline-offset: 4px;
+    box-shadow: 0 0 0 4px rgba(200, 168, 130, 0.1);
+  }
+
+  .card-accent {
+    height: 4px;
+    background: linear-gradient(
+      90deg,
+      var(--brand-warm) 0%,
+      var(--brand-gold) 50%,
+      var(--brand-warm) 100%
+    );
+    background-size: 200% 100%;
+    opacity: 0.8;
+    transition:
+      opacity var(--duration-fast),
+      height var(--duration-fast),
+      box-shadow var(--duration-fast);
+  }
+
+  .card-glow {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity var(--duration-normal);
+    pointer-events: none;
+    z-index: 0;
+    border-radius: inherit;
+  }
+
+  .card:hover .card-accent {
+    opacity: 1;
+    height: 5px;
+    animation: shimmer-accent 2s linear infinite;
+    box-shadow: 0 2px 12px rgba(200, 168, 130, 0.2);
+  }
+
+  .card-body {
+    padding: 48px 32px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .card-to {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-lg);
+  }
+
+  .to-label {
+    font-family: var(--font-body);
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-muted);
+  }
+
+  .to-name {
+    font-family: var(--font-body);
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: 1px;
+    color: var(--text-accent);
+  }
+
+  .card-content {
+    font-family: var(--font-display);
+    font-size: 22px;
+    line-height: 1.65;
+    color: var(--text-primary);
+    margin: 0;
+    font-weight: 400;
+  }
+
+  .card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 48px;
+    padding-top: var(--space-md);
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .card-from {
+    font-size: 14px;
+    color: var(--text-secondary);
+    font-style: italic;
+  }
+
+  .card-time {
+    font-size: 13px;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  @media (max-width: 600px) {
+    .card-body {
+      padding: var(--space-xl) var(--space-lg);
+    }
+
+    .card-content {
+      font-size: 19px;
+    }
+  }
+</style>

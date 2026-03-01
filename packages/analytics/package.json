@@ -1,0 +1,25 @@
+{
+  "name": "@wlu/analytics",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "report": "npx tsx src/index.ts report",
+    "collect": "npx tsx src/index.ts collect",
+    "strategy": "npx tsx src/index.ts strategy",
+    "learn": "npx tsx src/index.ts learn",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@wlu/shared": "*",
+    "playwright": "^1.58.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}

@@ -1,0 +1,410 @@
+---
+import Base from '../layouts/Base.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import { createMessage, sanitizeMessageInput } from '@wlu/shared';
+
+let submitted = false;
+let formError = '';
+
+const formToken = Date.now().toString(36);
+
+if (Astro.request.method === 'POST') {
+  try {
+    const formData = await Astro.request.formData();
+
+    // Honeypot: bots fill hidden fields, real users don't
+    const honeypot = formData.get('website')?.toString() || '';
+    if (honeypot) {
+      submitted = true; // Fake success so bots don't retry
+    } else {
+      // Timing check: reject submissions faster than 3 seconds
+      const token = formData.get('_token')?.toString() || '';
+      const tokenTime = parseInt(token, 36);
+      const elapsed = Date.now() - tokenTime;
+
+      if (!token || isNaN(tokenTime) || elapsed < 3000) {
+        formError = 'Please take your time. Try submitting again.';
+      } else {
+        const rawFrom = formData.get('from')?.toString() || '';
+        const rawTo = formData.get('to')?.toString() || '';
+        const rawContent = formData.get('content')?.toString() || '';
+        const rawEmail = formData.get('email')?.toString() || '';
+
+        const sanitized = sanitizeMessageInput({
+          from: rawFrom,
+          to: rawTo,
+          content: rawContent,
+          email: rawEmail || undefined,
+        });
+
+        if (!sanitized.from || !sanitized.to || !sanitized.content) {
+          formError = 'Please fill in all required fields.';
+        } else if (sanitized.content.length < 10) {
+          formError = 'Your message is too short. Say a little more.';
+        } else {
+          await createMessage(sanitized);
+          submitted = true;
+        }
+      }
+    }
+  } catch (e) {
+    formError = 'Something went wrong. Please try again.';
+  }
+}
+---
+
+<Base
+  title="Share Your Words | Words Left Unsaid"
+  description="Write the message you never sent. Share anonymously."
+>
+  <Header />
+
+  <main class="submit-page">
+    <div class="container">
+      {submitted ? (
+        <div class="success-state fade-in">
+          <div class="success-icon" aria-hidden="true">&ldquo;</div>
+          <h1 class="success-title">Your words are free now.</h1>
+          <p class="success-text">
+            Thank you for letting them out. Your message will appear once it's been reviewed.
+          </p>
+          <div class="success-actions">
+            <a href="/submit" class="btn-ghost">Write another</a>
+            <a href="/" class="btn-ghost">Browse messages</a>
+          </div>
+        </div>
+      ) : (
+        <div class="form-container">
+          <div class="form-header fade-in">
+            <h1 class="form-title">Say what you never could.</h1>
+            <p class="form-subtitle">
+              This is a safe, anonymous space. No one will know who wrote this &mdash;
+              but the words will finally exist outside of you.
+            </p>
+          </div>
+
+          <form method="POST" class="message-form fade-in" id="submit-form">
+            {formError && (
+              <div class="form-error" role="alert">{formError}</div>
+            )}
+
+            {/* Honeypot — invisible to real users, bots fill it */}
+            <div aria-hidden="true" style="position:absolute;left:-9999px;top:-9999px;">
+              <label for="website">Website</label>
+              <input type="text" id="website" name="website" tabindex="-1" autocomplete="off" />
+            </div>
+            <input type="hidden" name="_token" value={formToken} />
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="to" class="form-label">To</label>
+                <input
+                  type="text"
+                  id="to"
+                  name="to"
+                  placeholder="The person, the place, the feeling..."
+                  maxlength="25"
+                  required
+                  class="form-input"
+                />
+              </div>
+              <div class="form-group">
+                <label for="from" class="form-label">From</label>
+                <input
+                  type="text"
+                  id="from"
+                  name="from"
+                  placeholder="A name, a stranger, anonymous..."
+                  maxlength="25"
+                  required
+                  class="form-input"
+                />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="content" class="form-label">Your message</label>
+              <textarea
+                id="content"
+                name="content"
+                placeholder="Write the words you've been holding inside..."
+                maxlength="500"
+                rows="8"
+                required
+                class="form-textarea"
+              ></textarea>
+              <div class="char-count">
+                <span id="char-current">0</span> / 500
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="email" class="form-label form-label-optional">
+                Email <span class="optional-tag">optional</span>
+              </label>
+              <input
+                type="email"
+                id="email"
+                name="email"
+                placeholder="Only if you want to be notified"
+                class="form-input"
+              />
+              <p class="form-hint">We'll only use this to notify you when your message is live. Never shared.</p>
+            </div>
+
+            <button type="submit" class="btn-submit" id="submit-btn">
+              Let it go
+            </button>
+          </form>
+        </div>
+      )}
+    </div>
+  </main>
+
+  <Footer />
+</Base>
+
+<script>
+  const textarea = document.getElementById('content') as HTMLTextAreaElement | null;
+  const counter = document.getElementById('char-current');
+  const form = document.getElementById('submit-form') as HTMLFormElement | null;
+  const submitBtn = document.getElementById('submit-btn') as HTMLButtonElement | null;
+
+  textarea?.addEventListener('input', () => {
+    if (counter) counter.textContent = String(textarea.value.length);
+  });
+
+  form?.addEventListener('submit', () => {
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Sending...';
+      submitBtn.style.opacity = '0.7';
+    }
+  });
+</script>
+
+<style>
+  .submit-page {
+    padding: var(--space-3xl) 0;
+    min-height: 80vh;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+  }
+
+  .form-container {
+    max-width: 600px;
+    margin: 0 auto;
+    width: 100%;
+  }
+
+  .form-header {
+    text-align: center;
+    margin-bottom: var(--space-2xl);
+  }
+
+  .form-title {
+    font-family: var(--font-display);
+    font-size: clamp(28px, 4vw, 36px);
+    font-weight: 400;
+    color: var(--text-primary);
+    margin-bottom: var(--space-md);
+  }
+
+  .form-subtitle {
+    font-size: 15px;
+    color: var(--text-secondary);
+    line-height: 1.7;
+    max-width: 480px;
+    margin: 0 auto;
+  }
+
+  /* Form */
+  .message-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xl);
+  }
+
+  .form-error {
+    padding: var(--space-md) var(--space-lg);
+    background: rgba(230, 57, 70, 0.08);
+    border: 1px solid rgba(230, 57, 70, 0.2);
+    border-radius: var(--radius-sm);
+    color: #e63946;
+    font-size: 14px;
+  }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-lg);
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+
+  .form-label {
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    color: var(--text-muted);
+  }
+
+  .form-label-optional {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+  }
+
+  .optional-tag {
+    font-size: 10px;
+    text-transform: lowercase;
+    letter-spacing: 0;
+    color: var(--text-muted);
+    opacity: 0.6;
+    font-weight: 400;
+  }
+
+  .form-input,
+  .form-textarea {
+    font-family: var(--font-body);
+    font-size: 15px;
+    color: var(--text-primary);
+    background: var(--bg-card);
+    border: 1px solid var(--border-card);
+    border-radius: var(--radius-sm);
+    padding: 14px 16px;
+    transition:
+      border-color var(--duration-fast),
+      box-shadow var(--duration-fast);
+    outline: none;
+  }
+
+  .form-input::placeholder,
+  .form-textarea::placeholder {
+    color: var(--text-muted);
+    opacity: 0.6;
+  }
+
+  .form-input:focus,
+  .form-textarea:focus {
+    border-color: var(--brand-warm);
+    box-shadow: 0 0 0 3px rgba(200, 168, 130, 0.15), inset 0 1px 2px rgba(200, 168, 130, 0.05);
+  }
+
+  .form-textarea {
+    resize: vertical;
+    min-height: 260px;
+    font-family: var(--font-display);
+    font-size: 20px;
+    line-height: 1.7;
+  }
+
+  .char-count {
+    font-size: 12px;
+    color: var(--text-muted);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .form-hint {
+    font-size: 12px;
+    color: var(--text-muted);
+    opacity: 0.7;
+  }
+
+  .btn-submit {
+    font-family: var(--font-body);
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: 1px;
+    padding: 16px 32px;
+    background: var(--brand-warm);
+    color: #0c0b0a;
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition:
+      background var(--duration-fast),
+      transform var(--duration-fast);
+    align-self: center;
+  }
+
+  .btn-submit:hover {
+    background: var(--brand-gold);
+    transform: translateY(-1px);
+  }
+
+  /* Success State */
+  .success-state {
+    text-align: center;
+    max-width: 500px;
+    margin: 0 auto;
+    padding: var(--space-2xl) 0;
+  }
+
+  .success-icon {
+    font-family: var(--font-display);
+    font-size: 80px;
+    line-height: 1;
+    color: var(--brand-warm);
+    opacity: 0.3;
+    margin: 0 auto var(--space-md);
+  }
+
+  .success-title {
+    font-family: var(--font-display);
+    font-size: 28px;
+    font-weight: 400;
+    color: var(--text-primary);
+    margin-bottom: var(--space-md);
+  }
+
+  .success-text {
+    font-size: 15px;
+    color: var(--text-secondary);
+    line-height: 1.7;
+    margin-bottom: var(--space-xl);
+  }
+
+  .success-actions {
+    display: flex;
+    gap: var(--space-md);
+    justify-content: center;
+  }
+
+  .btn-ghost {
+    display: inline-block;
+    padding: 12px 28px;
+    border: 1px solid var(--border-subtle);
+    color: var(--text-secondary);
+    font-family: var(--font-body);
+    font-size: 14px;
+    border-radius: var(--radius-sm);
+    text-decoration: none;
+    transition:
+      border-color var(--duration-fast),
+      color var(--duration-fast);
+  }
+
+  .btn-ghost:hover {
+    border-color: var(--text-muted);
+    color: var(--text-primary);
+  }
+
+  @media (max-width: 600px) {
+    .form-row {
+      grid-template-columns: 1fr;
+    }
+
+    .submit-page {
+      padding: var(--space-2xl) 0;
+    }
+  }
+</style>

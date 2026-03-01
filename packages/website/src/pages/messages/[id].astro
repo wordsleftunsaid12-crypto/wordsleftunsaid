@@ -1,0 +1,407 @@
+---
+import Base from '../../layouts/Base.astro';
+import Header from '../../components/Header.astro';
+import Footer from '../../components/Footer.astro';
+import { getMessageById } from '@wlu/shared';
+
+const { id } = Astro.params;
+
+if (!id) {
+  return Astro.redirect('/');
+}
+
+const message = await getMessageById(id);
+
+if (!message || !message.approved) {
+  return Astro.redirect('/');
+}
+
+const date = new Date(message.created_at);
+const formattedDate = date.toLocaleDateString('en-US', {
+  month: 'long',
+  day: 'numeric',
+  year: 'numeric',
+});
+
+const truncatedContent =
+  message.content.length > 120
+    ? message.content.slice(0, 120) + '...'
+    : message.content;
+
+const pageUrl = new URL(`/messages/${id}`, Astro.site).toString();
+const shareText = `"${truncatedContent}" — Words Left Unsaid`;
+---
+
+<Base
+  title={`To ${message.to} | Words Left Unsaid`}
+  description={truncatedContent}
+>
+  <Header />
+
+  <main class="message-page">
+    <div class="container">
+      <div class="message-nav">
+        <a href={`/#msg-${id}`} class="btn-back">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" />
+          </svg>
+          Back to all messages
+        </a>
+      </div>
+
+      <article class="message-full fade-in">
+        <div class="message-accent" aria-hidden="true"></div>
+
+        <div class="message-body">
+          <div class="message-to">
+            <span class="to-label">To</span>
+            <span class="to-name">{message.to}</span>
+          </div>
+
+          <blockquote class="message-content">
+            {message.content}
+          </blockquote>
+
+          <div class="message-meta">
+            <span class="message-from">&mdash; {message.from}</span>
+            <time class="message-date" datetime={date.toISOString()}>
+              {formattedDate}
+            </time>
+          </div>
+        </div>
+      </article>
+
+      <!-- Share -->
+      <div class="share-section fade-in">
+        <span class="share-label">Share this message</span>
+        <div class="share-buttons">
+          <button class="share-btn" id="copy-link" aria-label="Copy link" data-url={pageUrl}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+            </svg>
+            <span class="share-btn-text">Copy link</span>
+          </button>
+          <a
+            class="share-btn"
+            href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(pageUrl)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Share on X"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+            </svg>
+            <span class="share-btn-text">Share on X</span>
+          </a>
+          <a
+            class="share-btn"
+            href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(pageUrl)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Share on Facebook"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+            </svg>
+            <span class="share-btn-text">Facebook</span>
+          </a>
+          <button class="share-btn" id="native-share" aria-label="Share" data-url={pageUrl} data-text={shareText} data-title={`To ${message.to} | Words Left Unsaid`} style="display: none;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
+              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+            </svg>
+            <span class="share-btn-text">Share</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="message-actions fade-in">
+        <a href="/submit" class="btn-write">Write your own</a>
+      </div>
+    </div>
+  </main>
+
+  <Footer />
+</Base>
+
+<script>
+  // Copy link
+  const copyBtn = document.getElementById('copy-link');
+  copyBtn?.addEventListener('click', async () => {
+    const url = copyBtn.getAttribute('data-url') || window.location.href;
+    await navigator.clipboard.writeText(url);
+    const textEl = copyBtn.querySelector('.share-btn-text');
+    if (textEl) {
+      const original = textEl.textContent;
+      textEl.textContent = 'Copied!';
+      copyBtn.classList.add('copied');
+      setTimeout(() => {
+        textEl.textContent = original;
+        copyBtn.classList.remove('copied');
+      }, 2000);
+    }
+  });
+
+  // Native share API
+  const nativeBtn = document.getElementById('native-share');
+  if (navigator.share && nativeBtn) {
+    nativeBtn.style.display = 'inline-flex';
+    nativeBtn.addEventListener('click', () => {
+      navigator.share({
+        title: nativeBtn.getAttribute('data-title') || '',
+        text: nativeBtn.getAttribute('data-text') || '',
+        url: nativeBtn.getAttribute('data-url') || window.location.href,
+      });
+    });
+  }
+</script>
+
+<style>
+  .message-page {
+    padding: var(--space-lg) 0 var(--space-xl);
+    min-height: 70vh;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+  }
+
+  .message-full {
+    max-width: 680px;
+    margin: 0 auto;
+    background: rgba(26, 24, 22, 0.6);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(200, 168, 130, 0.1);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow:
+      0 4px 24px rgba(0, 0, 0, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  }
+
+  :global([data-theme='light']) .message-full {
+    background: rgba(255, 255, 255, 0.7);
+    border-color: rgba(140, 110, 90, 0.1);
+    box-shadow:
+      0 4px 24px rgba(0, 0, 0, 0.04),
+      inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  }
+
+  .message-accent {
+    height: 3px;
+    background: linear-gradient(
+      90deg,
+      var(--brand-warm) 0%,
+      var(--brand-gold) 100%
+    );
+    opacity: 0.7;
+  }
+
+  .message-body {
+    padding: var(--space-xl) var(--space-xl);
+  }
+
+  .message-to {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-xl);
+  }
+
+  .to-label {
+    font-family: var(--font-body);
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    color: var(--text-muted);
+  }
+
+  .to-name {
+    font-family: var(--font-body);
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 1px;
+    color: var(--text-accent);
+  }
+
+  .message-content {
+    font-family: var(--font-display);
+    font-size: clamp(22px, 3vw, 28px);
+    line-height: 1.65;
+    color: var(--text-primary);
+    margin: 0;
+    font-weight: 400;
+    white-space: pre-line;
+  }
+
+  .message-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: var(--space-xl);
+    padding-top: var(--space-md);
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .message-from {
+    font-size: 14px;
+    color: var(--text-secondary);
+    font-style: italic;
+  }
+
+  .message-date {
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+
+  /* Share section */
+  .share-section {
+    max-width: 680px;
+    margin: var(--space-lg) auto 0;
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+  }
+
+  .share-label {
+    font-size: 12px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    white-space: nowrap;
+  }
+
+  .share-buttons {
+    display: flex;
+    gap: var(--space-sm);
+    flex-wrap: wrap;
+  }
+
+  .share-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    font-family: var(--font-body);
+    font-size: 12px;
+    cursor: pointer;
+    text-decoration: none;
+    transition:
+      color var(--duration-fast),
+      border-color var(--duration-fast),
+      background var(--duration-fast);
+  }
+
+  .share-btn:hover {
+    color: var(--text-primary);
+    border-color: var(--text-muted);
+    background: var(--bg-card-hover);
+  }
+
+  .share-btn.copied {
+    color: var(--brand-warm);
+    border-color: var(--brand-warm);
+  }
+
+  .share-btn-text {
+    display: none;
+  }
+
+  @media (min-width: 600px) {
+    .share-btn-text {
+      display: inline;
+    }
+  }
+
+  /* Navigation */
+  .message-nav {
+    max-width: 680px;
+    margin: 0 auto var(--space-lg);
+  }
+
+  .btn-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    background: var(--bg-card);
+    transition:
+      color var(--duration-fast),
+      border-color var(--duration-fast),
+      background var(--duration-fast);
+  }
+
+  .btn-back:hover {
+    color: var(--text-primary);
+    border-color: var(--text-muted);
+    background: var(--bg-card-hover);
+  }
+
+  /* Actions */
+  .message-actions {
+    max-width: 680px;
+    margin: var(--space-xl) auto 0;
+    display: flex;
+    justify-content: center;
+  }
+
+  .btn-write {
+    display: inline-block;
+    padding: 10px 24px;
+    border: 1px solid var(--border-subtle);
+    color: var(--text-secondary);
+    font-size: 13px;
+    border-radius: var(--radius-sm);
+    text-decoration: none;
+    transition:
+      border-color var(--duration-fast),
+      color var(--duration-fast);
+  }
+
+  .btn-write:hover {
+    border-color: var(--text-muted);
+    color: var(--text-primary);
+  }
+
+  /* Staggered share button entrance */
+  .share-btn {
+    opacity: 0;
+    transform: translateY(8px);
+    animation: share-btn-in 0.4s ease-out forwards;
+  }
+
+  .share-btn:nth-child(1) { animation-delay: 0.6s; }
+  .share-btn:nth-child(2) { animation-delay: 0.75s; }
+  .share-btn:nth-child(3) { animation-delay: 0.9s; }
+  .share-btn:nth-child(4) { animation-delay: 1.05s; }
+
+  @keyframes share-btn-in {
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @media (max-width: 600px) {
+    .message-body {
+      padding: var(--space-xl) var(--space-lg);
+    }
+
+    .share-section {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+  }
+</style>

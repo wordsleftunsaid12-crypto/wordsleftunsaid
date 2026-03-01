@@ -1,0 +1,790 @@
+---
+import Base from '../layouts/Base.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import MessageCard from '../components/MessageCard.astro';
+import { getApprovedMessages, searchMessages } from '@wlu/shared';
+
+const searchQuery = Astro.url.searchParams.get('q')?.trim() || '';
+let messages: Awaited<ReturnType<typeof getApprovedMessages>> = [];
+let error = '';
+
+try {
+  messages = searchQuery
+    ? await searchMessages(searchQuery, { limit: 30 })
+    : await getApprovedMessages({ limit: 30 });
+} catch (e) {
+  error = e instanceof Error ? e.message : 'Failed to load messages';
+}
+---
+
+<Base>
+  <Header />
+
+  <main>
+    <!-- Hero -->
+    <section class="hero">
+      <canvas id="hero-particles" class="particles-canvas" aria-hidden="true"></canvas>
+      <div class="hero-glow" aria-hidden="true"></div>
+      <div class="hero-orb hero-orb-1" aria-hidden="true"></div>
+      <div class="hero-orb hero-orb-2" aria-hidden="true"></div>
+      <div class="hero-orb hero-orb-3" aria-hidden="true"></div>
+      <div class="hero-inner">
+        <div class="section-divider hero-divider" aria-hidden="true">
+          <div class="section-divider-diamond"></div>
+        </div>
+        <h1 class="hero-title blur-in" id="hero-title">
+          <span class="word-reveal">The</span>
+          <span class="word-reveal">words</span>
+          <span class="word-reveal">we</span>
+          <span class="word-reveal">never</span>
+          <span class="word-reveal">said</span>
+          <br />
+          <span class="hero-highlight">
+            <span class="word-reveal">still</span>
+            <span class="word-reveal">deserve</span>
+            <span class="word-reveal">to</span>
+            <span class="word-reveal">be</span>
+            <span class="word-reveal">heard.</span>
+          </span>
+        </h1>
+        <p class="hero-subtitle blur-in">
+          An anonymous space for the letters you never sent, the apologies left unspoken,
+          and the love you kept inside.
+        </p>
+        <div class="hero-actions blur-in">
+          <a href="/submit" class="btn-primary">Share your words</a>
+          <a href="#messages" class="btn-ghost">Read messages</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Messages Feed -->
+    <section id="messages" class="messages-section">
+      <div class="container">
+        <div class="section-header fade-in">
+          <h2 class="section-title">{searchQuery ? `Results for "${searchQuery}"` : 'Recent messages'}</h2>
+          <p class="section-subtitle">Words left unsaid, finally given a voice</p>
+          <form class="search-form" action="/" method="GET">
+            <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <input
+              type="text"
+              name="q"
+              class="search-input"
+              placeholder="Search messages..."
+              value={searchQuery}
+              autocomplete="off"
+            />
+            {searchQuery && (
+              <a href="/" class="search-clear" aria-label="Clear search">&times;</a>
+            )}
+          </form>
+        </div>
+
+        {error ? (
+          <div class="error-state fade-in">
+            <p>Something went wrong loading messages.</p>
+            <p class="error-detail">{error}</p>
+          </div>
+        ) : messages.length === 0 ? (
+          <div class="empty-state fade-in">
+            <p class="empty-title">Be the first to share what's in your heart</p>
+            <p class="empty-subtitle">Every story starts with someone brave enough to go first.</p>
+            <a href="/submit" class="btn-primary">Write a message</a>
+          </div>
+        ) : (
+          <div class="messages-grid stagger">
+            {messages.map((msg) => (
+              <MessageCard
+                id={msg.id}
+                from={msg.from}
+                to={msg.to}
+                content={msg.content}
+                createdAt={msg.created_at}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+      <canvas id="particles" class="particles-canvas" aria-hidden="true"></canvas>
+    </section>
+
+    <!-- Divider -->
+    <div class="section-divider" aria-hidden="true">
+      <div class="section-divider-diamond"></div>
+    </div>
+
+    <!-- CTA -->
+    <section class="cta-section fade-in">
+      <div class="container">
+        <div class="cta-border-wrap">
+          <div class="cta-card">
+            <h2 class="cta-title">Have something you need to say?</h2>
+            <p class="cta-text">
+              Some words are too important to stay silent. Share them here, anonymously.
+            </p>
+            <a href="/submit" class="btn-primary">Write your message</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <Footer />
+</Base>
+
+<script>
+  // Scroll to the card referenced by the URL hash (e.g. #msg-abc123)
+  if (window.location.hash?.startsWith('#msg-')) {
+    const el = document.querySelector(window.location.hash);
+    if (el) {
+      requestAnimationFrame(() => {
+        const top = el.getBoundingClientRect().top + window.scrollY - 80;
+        window.scrollTo({ top, behavior: 'instant' });
+      });
+    }
+  }
+
+  // Floating particles system
+  function initParticles(canvasId: string, particleCount: number) {
+    const canvas = document.getElementById(canvasId) as HTMLCanvasElement | null;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const section = canvas.parentElement!;
+    let w = 0;
+    let h = 0;
+
+    interface Particle {
+      x: number; y: number; vx: number; vy: number;
+      size: number; opacity: number;
+      type: 'star' | 'heart';
+      angle: number; rotSpeed: number;
+    }
+
+    const particles: Particle[] = [];
+
+    function resize() {
+      const newW = section.offsetWidth;
+      const newH = section.offsetHeight;
+      if (newW === w && newH === h) return;
+      w = newW;
+      h = newH;
+      canvas!.width = w;
+      canvas!.height = h;
+    }
+
+    function seed() {
+      resize();
+      particles.length = 0;
+      if (w === 0 || h === 0) return;
+      const types: Particle['type'][] = ['star', 'star', 'heart'];
+      for (let i = 0; i < particleCount; i++) {
+        particles.push({
+          x: Math.random() * w,
+          y: Math.random() * h,
+          vx: (Math.random() - 0.5) * 0.25,
+          vy: -Math.random() * 0.15 - 0.03,
+          size: Math.random() * 4 + 3,
+          opacity: Math.random() * 0.35 + 0.15,
+          type: types[Math.floor(Math.random() * types.length)],
+          angle: Math.random() * Math.PI * 2,
+          rotSpeed: (Math.random() - 0.5) * 0.008,
+        });
+      }
+    }
+
+    function drawStar(x: number, y: number, r: number) {
+      const spikes = 5;
+      const outerR = r;
+      const innerR = r * 0.4;
+      ctx!.beginPath();
+      for (let i = 0; i < spikes * 2; i++) {
+        const radius = i % 2 === 0 ? outerR : innerR;
+        const a = (i / (spikes * 2)) * Math.PI * 2 - Math.PI / 2;
+        const px = x + Math.cos(a) * radius;
+        const py = y + Math.sin(a) * radius;
+        if (i === 0) ctx!.moveTo(px, py);
+        else ctx!.lineTo(px, py);
+      }
+      ctx!.closePath();
+      ctx!.fill();
+    }
+
+    function drawHeart(x: number, y: number, s: number) {
+      // Parametric heart curve — always looks crisp
+      ctx!.beginPath();
+      for (let i = 0; i <= 60; i++) {
+        const t = (i / 60) * Math.PI * 2;
+        const px = x + s * Math.pow(Math.sin(t), 3);
+        const py = y - s * (0.8125 * Math.cos(t) - 0.3125 * Math.cos(2 * t) - 0.125 * Math.cos(3 * t) - 0.0625 * Math.cos(4 * t));
+        if (i === 0) ctx!.moveTo(px, py);
+        else ctx!.lineTo(px, py);
+      }
+      ctx!.closePath();
+      ctx!.fill();
+    }
+
+
+    function draw() {
+      if (w === 0 || h === 0) {
+        resize();
+        if (w > 0 && h > 0) seed();
+      }
+      ctx!.clearRect(0, 0, w, h);
+      const theme = document.documentElement.getAttribute('data-theme');
+      const color = theme === 'light' ? '90, 66, 49' : '200, 168, 130';
+
+      for (const p of particles) {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.angle += p.rotSpeed;
+        if (p.y < -10) p.y = h + 10;
+        if (p.y > h + 10) p.y = -10;
+        if (p.x < -10) p.x = w + 10;
+        if (p.x > w + 10) p.x = -10;
+
+        ctx!.save();
+        ctx!.globalAlpha = p.opacity;
+        ctx!.fillStyle = `rgba(${color}, 1)`;
+        ctx!.shadowColor = `rgba(${color}, 0.4)`;
+        ctx!.shadowBlur = 6;
+        ctx!.translate(p.x, p.y);
+
+        if (p.type === 'star') {
+          ctx!.rotate(p.angle);
+          drawStar(0, 0, p.size * 2.5);
+        } else {
+          drawHeart(0, 0, p.size * 2);
+        }
+        ctx!.restore();
+      }
+      requestAnimationFrame(draw);
+    }
+
+    seed();
+    draw();
+    window.addEventListener('resize', () => {
+      const oldH = h;
+      resize();
+      // Re-seed if height changed significantly (content loaded late)
+      if (h > 0 && (oldH === 0 || Math.abs(h - oldH) > 100)) seed();
+    });
+
+    // Watch for section size changes (e.g. images loading, fonts, late content)
+    if (typeof ResizeObserver !== 'undefined') {
+      const ro = new ResizeObserver(() => {
+        const oldH = h;
+        resize();
+        if (h > 0 && oldH === 0) seed();
+      });
+      ro.observe(section);
+    }
+  }
+
+  // Defer particle init to ensure layout is fully computed
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      initParticles('hero-particles', 10);
+      initParticles('particles', 35);
+    });
+  });
+
+  // Parallax: hero glow and orbs drift slower than scroll
+  const heroGlow = document.querySelector<HTMLElement>('.hero-glow');
+  const orbs = document.querySelectorAll<HTMLElement>('.hero-orb');
+
+  if (heroGlow || orbs.length) {
+    let ticking = false;
+    window.addEventListener('scroll', () => {
+      if (!ticking) {
+        requestAnimationFrame(() => {
+          const y = window.scrollY;
+          if (heroGlow) {
+            heroGlow.style.transform = `translateX(-50%) translateY(${y * 0.3}px)`;
+          }
+          orbs.forEach((orb, i) => {
+            const speed = 0.15 + i * 0.08;
+            orb.style.marginTop = `${y * speed}px`;
+          });
+          ticking = false;
+        });
+        ticking = true;
+      }
+    });
+  }
+</script>
+
+<style>
+  /* Hero */
+  .hero {
+    padding: var(--space-xl) var(--space-lg) var(--space-lg);
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero-glow {
+    position: absolute;
+    top: 20%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 900px;
+    height: 700px;
+    background:
+      radial-gradient(ellipse at 40% 50%, rgba(200, 168, 130, 0.12) 0%, transparent 50%),
+      radial-gradient(ellipse at 60% 40%, rgba(212, 169, 106, 0.08) 0%, transparent 45%),
+      radial-gradient(ellipse at 50% 60%, rgba(232, 201, 160, 0.06) 0%, transparent 55%);
+    pointer-events: none;
+    animation: glow-pulse 6s ease-in-out infinite;
+  }
+
+  .hero::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 40px;
+    background: linear-gradient(180deg, transparent, var(--bg-primary));
+    pointer-events: none;
+  }
+
+  .hero-orb {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+    filter: blur(60px);
+    opacity: 0;
+    animation: orb-fade-in 2s ease-out forwards;
+  }
+
+  .hero-orb-1 {
+    width: 200px;
+    height: 200px;
+    top: 10%;
+    left: 15%;
+    background: rgba(200, 168, 130, 0.08);
+    animation: orb-float-1 12s ease-in-out infinite, orb-fade-in 2s ease-out forwards;
+  }
+
+  .hero-orb-2 {
+    width: 150px;
+    height: 150px;
+    top: 40%;
+    right: 10%;
+    background: rgba(212, 169, 106, 0.06);
+    animation: orb-float-2 15s ease-in-out infinite, orb-fade-in 2s 0.5s ease-out forwards;
+  }
+
+  .hero-orb-3 {
+    width: 120px;
+    height: 120px;
+    bottom: 20%;
+    left: 35%;
+    background: rgba(232, 201, 160, 0.05);
+    animation: orb-float-3 18s ease-in-out infinite, orb-fade-in 2s 1s ease-out forwards;
+  }
+
+  @keyframes orb-fade-in {
+    to { opacity: 1; }
+  }
+
+  @keyframes orb-float-1 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    33% { transform: translate(30px, -20px) scale(1.1); }
+    66% { transform: translate(-20px, 15px) scale(0.95); }
+  }
+
+  @keyframes orb-float-2 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    33% { transform: translate(-25px, 25px) scale(1.05); }
+    66% { transform: translate(15px, -10px) scale(0.9); }
+  }
+
+  @keyframes orb-float-3 {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50% { transform: translate(20px, -30px) scale(1.15); }
+  }
+
+  .hero-inner {
+    max-width: 720px;
+    margin: 0 auto;
+    position: relative;
+  }
+
+  .hero-divider {
+    padding: 0 0 var(--space-lg);
+  }
+
+  .hero-title {
+    font-family: var(--font-display);
+    font-size: clamp(32px, 4.5vw, 46px);
+    font-weight: 400;
+    line-height: 1.3;
+    letter-spacing: -0.5px;
+    color: var(--text-primary);
+    margin-bottom: var(--space-md);
+    text-shadow: 0 2px 24px rgba(200, 168, 130, 0.1);
+  }
+
+  .word-reveal {
+    display: inline-block;
+    opacity: 0;
+    transform: translateY(12px);
+    filter: blur(4px);
+    animation: word-appear 0.6s ease-out forwards;
+  }
+
+  .word-reveal:nth-child(1) { animation-delay: 0.1s; }
+  .word-reveal:nth-child(2) { animation-delay: 0.2s; }
+  .word-reveal:nth-child(3) { animation-delay: 0.3s; }
+  .word-reveal:nth-child(4) { animation-delay: 0.4s; }
+  .word-reveal:nth-child(5) { animation-delay: 0.5s; }
+
+  .hero-highlight .word-reveal:nth-child(1) { animation-delay: 0.65s; }
+  .hero-highlight .word-reveal:nth-child(2) { animation-delay: 0.75s; }
+  .hero-highlight .word-reveal:nth-child(3) { animation-delay: 0.85s; }
+  .hero-highlight .word-reveal:nth-child(4) { animation-delay: 0.95s; }
+  .hero-highlight .word-reveal:nth-child(5) { animation-delay: 1.05s; }
+
+  @keyframes word-appear {
+    to {
+      opacity: 1;
+      transform: translateY(0);
+      filter: blur(0);
+    }
+  }
+
+  .hero-highlight {
+    font-style: italic;
+    font-weight: 600;
+    background: linear-gradient(135deg, var(--brand-warm) 0%, var(--brand-gold) 40%, #e8c9a0 70%, var(--brand-warm) 100%);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: gradient-shift 6s ease-in-out infinite;
+  }
+
+  .hero-subtitle {
+    font-size: 16px;
+    line-height: 1.7;
+    color: var(--text-secondary);
+    max-width: 520px;
+    margin: 0 auto var(--space-md);
+  }
+
+  .hero-actions {
+    display: flex;
+    gap: var(--space-md);
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  /* Buttons */
+  .btn-primary {
+    display: inline-block;
+    padding: 14px 32px;
+    background: linear-gradient(135deg, var(--brand-warm), var(--brand-gold));
+    color: #0c0b0a;
+    font-family: var(--font-body);
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 1px;
+    border-radius: var(--radius-sm);
+    text-decoration: none;
+    box-shadow: 0 2px 12px rgba(200, 168, 130, 0.2);
+    animation: btn-glow 3s ease-in-out infinite;
+    transition:
+      background var(--duration-fast),
+      transform var(--duration-fast),
+      box-shadow var(--duration-fast);
+  }
+
+  @keyframes btn-glow {
+    0%, 100% { box-shadow: 0 2px 12px rgba(200, 168, 130, 0.2); }
+    50% { box-shadow: 0 4px 20px rgba(200, 168, 130, 0.4), 0 0 40px rgba(200, 168, 130, 0.1); }
+  }
+
+  .btn-primary:hover {
+    background: linear-gradient(135deg, var(--brand-gold), #e8c9a0);
+    color: #0c0b0a;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 24px rgba(200, 168, 130, 0.3);
+  }
+
+  .btn-primary:active {
+    transform: translateY(0) scale(0.98);
+    box-shadow: 0 1px 6px rgba(200, 168, 130, 0.15);
+  }
+
+  .btn-ghost {
+    display: inline-block;
+    padding: 13px 32px;
+    border: 1px solid rgba(200, 168, 130, 0.2);
+    color: var(--text-secondary);
+    font-family: var(--font-body);
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 1px;
+    border-radius: var(--radius-sm);
+    text-decoration: none;
+    transition:
+      border-color var(--duration-fast),
+      color var(--duration-fast);
+  }
+
+  .btn-ghost:hover {
+    border-color: var(--text-muted);
+    color: var(--text-primary);
+    box-shadow: 0 0 20px rgba(200, 168, 130, 0.06);
+  }
+
+  .btn-ghost:active {
+    transform: scale(0.98);
+  }
+
+  .particles-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  /* Section Header */
+  .messages-section {
+    padding: var(--space-lg) 0;
+    position: relative;
+  }
+
+  .messages-section > .container {
+    position: relative;
+    z-index: 2;
+  }
+
+  .messages-section::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle, var(--border-subtle) 1px, transparent 1px);
+    background-size: 40px 40px;
+    opacity: 0.3;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .section-header {
+    text-align: center;
+    margin-bottom: var(--space-xl);
+  }
+
+  .section-title {
+    font-family: var(--font-display);
+    font-size: 28px;
+    font-weight: 400;
+    color: var(--text-primary);
+    margin-bottom: var(--space-sm);
+  }
+
+  .section-subtitle {
+    font-size: 14px;
+    color: var(--text-muted);
+    letter-spacing: 0.5px;
+  }
+
+  /* Search */
+  .search-form {
+    position: relative;
+    max-width: 400px;
+    margin: var(--space-lg) auto 0;
+  }
+
+  .search-icon {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    pointer-events: none;
+  }
+
+  .search-input {
+    width: 100%;
+    padding: 10px 40px 10px 40px;
+    background: rgba(26, 24, 22, 0.4);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    font-size: 14px;
+    outline: none;
+    transition:
+      border-color var(--duration-fast),
+      box-shadow var(--duration-fast);
+  }
+
+  .search-input::placeholder {
+    color: var(--text-muted);
+  }
+
+  .search-input:focus {
+    border-color: var(--brand-warm);
+    box-shadow:
+      0 0 0 3px rgba(200, 168, 130, 0.1),
+      0 0 20px rgba(200, 168, 130, 0.05);
+  }
+
+  .search-clear {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 20px;
+    color: var(--text-muted);
+    text-decoration: none;
+    line-height: 1;
+    padding: 4px;
+    transition: color var(--duration-fast);
+  }
+
+  .search-clear:hover {
+    color: var(--text-primary);
+  }
+
+  /* Messages Grid */
+  .messages-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 32px;
+  }
+
+  /* Empty & Error States */
+  .empty-state,
+  .error-state {
+    text-align: center;
+    padding: var(--space-3xl) var(--space-lg);
+  }
+
+  .empty-title {
+    font-family: var(--font-display);
+    font-size: 24px;
+    color: var(--text-primary);
+    margin-bottom: var(--space-sm);
+  }
+
+  .empty-subtitle,
+  .error-detail {
+    font-size: 14px;
+    color: var(--text-muted);
+    margin-bottom: var(--space-xl);
+  }
+
+  .error-state p:first-child {
+    font-size: 16px;
+    color: var(--text-secondary);
+    margin-bottom: var(--space-sm);
+  }
+
+  /* CTA */
+  .cta-section {
+    padding: var(--space-2xl) 0;
+  }
+
+  .cta-border-wrap {
+    position: relative;
+    border-radius: var(--radius-lg);
+    padding: 1px;
+    overflow: hidden;
+  }
+
+  .cta-border-wrap::before {
+    content: '';
+    position: absolute;
+    inset: -150%;
+    background: conic-gradient(
+      from 0deg,
+      transparent 0%,
+      var(--brand-warm) 10%,
+      var(--brand-gold) 20%,
+      transparent 30%,
+      transparent 70%,
+      var(--brand-gold) 80%,
+      var(--brand-warm) 90%,
+      transparent 100%
+    );
+    animation: border-rotate 8s linear infinite;
+    opacity: 0.5;
+  }
+
+  @keyframes border-rotate {
+    to { transform: rotate(360deg); }
+  }
+
+  .cta-card {
+    text-align: center;
+    padding: var(--space-3xl) var(--space-xl);
+    border-radius: var(--radius-lg);
+    background: rgba(26, 24, 22, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    position: relative;
+    overflow: hidden;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  }
+
+  :global([data-theme='light']) .cta-card {
+    background: rgba(248, 246, 241, 0.95);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  }
+
+  .cta-card::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 400px;
+    height: 400px;
+    background: radial-gradient(ellipse at center, rgba(200, 168, 130, 0.06) 0%, transparent 60%);
+    pointer-events: none;
+  }
+
+  .cta-title {
+    font-family: var(--font-display);
+    font-size: 28px;
+    font-weight: 400;
+    color: var(--text-primary);
+    margin-bottom: var(--space-md);
+  }
+
+  .cta-text {
+    font-size: 15px;
+    color: var(--text-secondary);
+    margin-bottom: var(--space-xl);
+    max-width: 480px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  @media (max-width: 600px) {
+    .hero {
+      padding: var(--space-xl) var(--space-md) var(--space-md);
+    }
+
+    .messages-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .cta-card {
+      padding: var(--space-2xl) var(--space-lg);
+    }
+  }
+</style>

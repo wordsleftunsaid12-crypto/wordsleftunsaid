@@ -1,0 +1,85 @@
+---
+interface Props {
+  title?: string;
+  description?: string;
+  ogImage?: string;
+}
+
+const {
+  title = 'Words Left Unsaid',
+  description = 'Share the messages you never sent. Be heard anonymously.',
+  ogImage = '/og-image.jpg',
+} = Astro.props;
+
+const canonicalUrl = new URL(Astro.url.pathname, Astro.site);
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonicalUrl} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:url" content={canonicalUrl} />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage} />
+
+    <!-- Google Analytics -->
+    <script
+      async
+      src="https://www.googletagmanager.com/gtag/js?id=G-CPHLT2VM2D"
+    ></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag() {
+        dataLayer.push(arguments);
+      }
+      gtag('js', new Date());
+      gtag('config', 'G-CPHLT2VM2D');
+    </script>
+  </head>
+  <body>
+    <slot />
+
+    <!-- Scroll-triggered fade-in observer -->
+    <script>
+      // Double-rAF ensures the browser has painted the initial hidden state
+      // before we start observing. Without this, elements already in the
+      // viewport get .visible added before the opacity:0 state is rendered,
+      // so the fade-in transition never plays.
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const observer = new IntersectionObserver(
+            (entries) => {
+              entries.forEach((entry) => {
+                if (entry.isIntersecting) {
+                  entry.target.classList.add('visible');
+                }
+              });
+            },
+            { threshold: 0.1, rootMargin: '0px 0px -40px 0px' },
+          );
+
+          document.querySelectorAll('.fade-in, .blur-in').forEach((el) => observer.observe(el));
+        });
+      });
+    </script>
+  </body>
+</html>
+
+<style is:global>
+  @import '../styles/global.css';
+</style>

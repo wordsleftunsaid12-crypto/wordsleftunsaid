@@ -1,0 +1,152 @@
+---
+import Base from '../layouts/Base.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+
+export const prerender = true;
+---
+
+<Base
+  title="About | Words Left Unsaid"
+  description="The story behind Words Left Unsaid — a space for the things we carry in silence."
+>
+  <Header />
+
+  <main class="about-page">
+    <div class="container">
+      <article class="about-content">
+        <h1 class="about-title fade-in">About this place</h1>
+
+        <div class="about-body fade-in">
+          <p>
+            We all carry words we never said. To someone we loved. To someone we lost.
+            To someone who will never know how deeply they mattered.
+          </p>
+
+          <blockquote class="pull-quote fade-in">
+            Some words are too heavy to carry alone, but too fragile to speak aloud.
+          </blockquote>
+
+          <p>
+            <strong>Words Left Unsaid</strong> is a space for those words. It's anonymous,
+            it's honest, and it's yours. No accounts, no profiles, no judgement &mdash;
+            just raw, human emotion.
+          </p>
+
+          <p>
+            Some messages are love letters that were never delivered. Some are apologies
+            that came too late. Some are simply the quiet truths we were too afraid to
+            speak aloud.
+          </p>
+
+          <p>
+            Every message here is real. Every one was written by someone who needed to
+            let go of something they've been carrying.
+          </p>
+
+          <p>
+            If you have words of your own, we'd love to hear them.
+          </p>
+        </div>
+
+        <div class="about-cta fade-in">
+          <a href="/submit" class="btn-primary">Share your words</a>
+        </div>
+      </article>
+    </div>
+  </main>
+
+  <Footer />
+</Base>
+
+<style>
+  .about-page {
+    padding: var(--space-3xl) 0;
+    min-height: 70vh;
+  }
+
+  .about-content {
+    max-width: 600px;
+    margin: 0 auto;
+  }
+
+  .about-title {
+    font-family: var(--font-display);
+    font-size: clamp(32px, 4vw, 40px);
+    font-weight: 400;
+    color: var(--text-primary);
+    margin-bottom: var(--space-2xl);
+    text-align: center;
+  }
+
+  .about-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-lg);
+  }
+
+  .about-body p {
+    font-size: 16px;
+    line-height: 1.8;
+    color: var(--text-secondary);
+  }
+
+  .about-body strong {
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+
+  .pull-quote {
+    font-family: var(--font-display);
+    font-size: clamp(20px, 3vw, 26px);
+    line-height: 1.6;
+    color: var(--text-primary);
+    font-style: italic;
+    text-align: center;
+    padding: var(--space-xl) var(--space-lg);
+    margin: var(--space-md) 0;
+    position: relative;
+    border-left: none;
+  }
+
+  .pull-quote::before {
+    content: '\201C';
+    font-family: var(--font-display);
+    font-size: 80px;
+    color: var(--brand-warm);
+    opacity: 0.15;
+    position: absolute;
+    top: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    line-height: 1;
+  }
+
+  .about-cta {
+    text-align: center;
+    margin-top: var(--space-2xl);
+    padding-top: var(--space-2xl);
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .btn-primary {
+    display: inline-block;
+    padding: 14px 32px;
+    background: var(--brand-warm);
+    color: #0c0b0a;
+    font-family: var(--font-body);
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 1px;
+    border-radius: var(--radius-sm);
+    text-decoration: none;
+    transition:
+      background var(--duration-fast),
+      transform var(--duration-fast);
+  }
+
+  .btn-primary:hover {
+    background: var(--brand-gold);
+    transform: translateY(-1px);
+  }
+</style>

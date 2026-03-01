@@ -1,0 +1,81 @@
+/* === Words Left Unsaid — Design Tokens === */
+
+:root {
+  /* Dark mode (default) */
+  --bg-primary: #0c0b0a;
+  --bg-secondary: #161412;
+  --bg-card: #1a1816;
+  --bg-card-hover: #201e1b;
+  --bg-surface: #0f0e0c;
+
+  --text-primary: #f0ece6;
+  --text-secondary: #c4b8ac;
+  --text-muted: #8a7c70;
+  --text-accent: #c8a882;
+
+  --border-subtle: rgba(200, 168, 130, 0.15);
+  --border-card: rgba(200, 168, 130, 0.12);
+
+  /* Brand */
+  --brand-warm: #c8a882;
+  --brand-gold: #d4a96a;
+
+  /* Emotional color system */
+  --mood-love: #e63946;
+  --mood-sadness: #457b9d;
+  --mood-hope: #2a9d8f;
+  --mood-nostalgia: #f4a261;
+  --mood-confusion: #a368d9;
+  --mood-gratitude: #e9c46a;
+  --mood-anger: #d62828;
+  --mood-peace: #84a98c;
+
+  /* Typography */
+  --font-display: 'Crimson Text', 'Georgia', serif;
+  --font-body: 'Inter', 'system-ui', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* Spacing */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 40px;
+  --space-2xl: 64px;
+  --space-3xl: 96px;
+
+  /* Radius */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+
+  /* Shadows */
+  --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.3);
+  --shadow-card-hover: 0 8px 30px rgba(0, 0, 0, 0.4);
+
+  /* Transitions */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 150ms;
+  --duration-normal: 300ms;
+  --duration-slow: 500ms;
+}
+
+/* Light mode */
+[data-theme='light'] {
+  --bg-primary: #f8f6f1;
+  --bg-secondary: #f0ece6;
+  --bg-card: #ffffff;
+  --bg-card-hover: #faf8f5;
+  --bg-surface: #ede8e0;
+
+  --text-primary: #1a1a1a;
+  --text-secondary: #4a3f35;
+  --text-muted: #7d7168;
+  --text-accent: #5a4231;
+
+  --border-subtle: rgba(140, 110, 90, 0.12);
+  --border-card: rgba(140, 110, 90, 0.1);
+
+  --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.06);
+  --shadow-card-hover: 0 8px 30px rgba(0, 0, 0, 0.1);
+}

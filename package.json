@@ -1,0 +1,22 @@
+{
+  "name": "wordsleftunsaid",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=packages/website",
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "eslint 'packages/**/*.{ts,tsx}'",
+    "format": "prettier --write 'packages/**/*.{ts,tsx,json,css,astro}'",
+    "format:check": "prettier --check 'packages/**/*.{ts,tsx,json,css,astro}'",
+    "render": "npm run render --workspace=packages/content-engine",
+    "post": "npm run post --workspace=packages/social",
+    "schedule": "npm run schedule --workspace=packages/social",
+    "collect": "npm run collect --workspace=packages/analytics",
+    "report": "npm run report --workspace=packages/analytics",
+    "db:migrate": "npx supabase db push",
+    "db:status": "npx supabase db status"
+  }
+}

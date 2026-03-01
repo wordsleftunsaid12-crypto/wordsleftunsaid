@@ -1,0 +1,33 @@
+{
+  "name": "@wlu/content-engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "render": "npx tsx src/index.ts render",
+    "curate": "npx tsx src/index.ts curate",
+    "batch": "npx tsx src/index.ts batch",
+    "preview": "npx remotion preview src/compositions/Root.tsx",
+    "studio": "npx remotion studio src/compositions/Root.tsx",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@remotion/bundler": "^4.0.427",
+    "@remotion/cli": "^4.0.0",
+    "@remotion/renderer": "^4.0.0",
+    "@wlu/shared": "*",
+    "dotenv": "^16.4.0",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0",
+    "remotion": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}

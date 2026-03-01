@@ -35,6 +35,7 @@ export {
   getApprovedMessages,
   getMessageById,
   createMessage,
+  createApprovedMessage,
   approveMessage,
   getUnapprovedMessages,
   searchMessages,
@@ -75,6 +76,9 @@ export {
 // Utils
 export { BRAND } from './utils/brand.js';
 export { sanitizeText, sanitizeMessageInput } from './utils/sanitize.js';
+export { moderateContent } from './utils/moderate.js';
+export type { ModerationResult } from './utils/moderate.js';
+export { notifyMessageApproved } from './utils/notify.js';
 
 // Config
 export { getEnv, getEnvSafe } from './config/env.js';

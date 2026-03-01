@@ -39,7 +39,9 @@ export async function getMessageById(id: string): Promise<Message | null> {
 export async function createMessage(input: CreateMessageInput): Promise<Message> {
   const client = getAnonClient();
 
-  const { data, error } = await client
+  // Note: we don't chain .select().single() because the RLS SELECT policy
+  // only allows reading approved messages, and new messages start unapproved.
+  const { error } = await client
     .from('messages')
     .insert({
       from: input.from,
@@ -47,12 +49,20 @@ export async function createMessage(input: CreateMessageInput): Promise<Message>
       content: input.content,
       email: input.email || null,
       approved: false,
-    })
-    .select()
-    .single();
+    });
 
   if (error) throw new Error(`Failed to create message: ${error.message}`);
-  return data as Message;
+
+  // Return a synthetic Message since we can't read it back through RLS
+  return {
+    id: crypto.randomUUID(),
+    from: input.from,
+    to: input.to,
+    content: input.content,
+    email: input.email || null,
+    approved: false,
+    created_at: new Date().toISOString(),
+  };
 }
 
 export async function approveMessage(id: string): Promise<Message> {
@@ -87,6 +97,25 @@ export async function searchMessages(
 
   if (error) throw new Error(`Failed to search messages: ${error.message}`);
   return data as Message[];
+}
+
+export async function createApprovedMessage(input: CreateMessageInput): Promise<Message> {
+  const client = getServiceClient();
+
+  const { data, error } = await client
+    .from('messages')
+    .insert({
+      from: input.from,
+      to: input.to,
+      content: input.content,
+      email: input.email || null,
+      approved: true,
+    })
+    .select()
+    .single();
+
+  if (error) throw new Error(`Failed to create approved message: ${error.message}`);
+  return data as Message;
 }
 
 export async function getUnapprovedMessages(): Promise<Message[]> {

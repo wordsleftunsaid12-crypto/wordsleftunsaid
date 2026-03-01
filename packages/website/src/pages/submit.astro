@@ -2,7 +2,12 @@
 import Base from '../layouts/Base.astro';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
-import { createMessage, sanitizeMessageInput } from '@wlu/shared';
+import {
+  createApprovedMessage,
+  sanitizeMessageInput,
+  moderateContent,
+  notifyMessageApproved,
+} from '@wlu/shared';
 
 let submitted = false;
 let formError = '';
@@ -43,8 +48,24 @@ if (Astro.request.method === 'POST') {
         } else if (sanitized.content.length < 10) {
           formError = 'Your message is too short. Say a little more.';
         } else {
-          await createMessage(sanitized);
-          submitted = true;
+          const moderation = moderateContent(sanitized.content, sanitized.from, sanitized.to);
+
+          if (!moderation.passed) {
+            formError = 'This message can\u2019t be posted. Please keep it respectful.';
+          } else {
+            const message = await createApprovedMessage(sanitized);
+            submitted = true;
+
+            // Send email notification (fire-and-forget, don't block the response)
+            if (sanitized.email) {
+              notifyMessageApproved({
+                messageId: message.id,
+                email: sanitized.email,
+                to: sanitized.to,
+                siteUrl: import.meta.env.SITE || 'https://wordsleftunsaid.netlify.app',
+              }).catch(() => {});
+            }
+          }
         }
       }
     }
@@ -67,7 +88,7 @@ if (Astro.request.method === 'POST') {
           <div class="success-icon" aria-hidden="true">&ldquo;</div>
           <h1 class="success-title">Your words are free now.</h1>
           <p class="success-text">
-            Thank you for letting them out. Your message will appear once it's been reviewed.
+            Thank you for letting them out. Your message is live.
           </p>
           <div class="success-actions">
             <a href="/submit" class="btn-ghost">Write another</a>

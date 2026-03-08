@@ -138,6 +138,7 @@ async function main() {
     case 'render-next': {
       const template = (process.argv[3] || 'CinematicVertical') as CompositionId;
       const count = Math.min(parseInt(process.argv[4] || '1', 10), 5);
+      const targetPlatform = (process.argv[5] || 'instagram') as 'instagram' | 'tiktok' | 'youtube';
 
       const { getApprovedMessages, getUsedMessageIds } = await import('@wlu/shared');
 
@@ -163,7 +164,7 @@ async function main() {
       const shuffled = candidates.sort(() => Math.random() - 0.5);
       const selected = shuffled.slice(0, count);
 
-      console.log(`Found ${unused.length} unused messages, rendering ${selected.length}...\n`);
+      console.log(`Found ${unused.length} unused messages, rendering ${selected.length} for ${targetPlatform}...\n`);
 
       const moods: Array<'tender' | 'regretful' | 'hopeful' | 'bittersweet' | 'raw'> = [
         'tender', 'regretful', 'hopeful', 'bittersweet', 'raw',
@@ -208,7 +209,7 @@ async function main() {
           messageIds: [msg.id],
           template,
           mood,
-          platform: 'instagram',
+          platform: targetPlatform,
           isExploration: false,
         });
         console.log(`  Queued with message ID tracked.\n`);
@@ -328,7 +329,7 @@ async function main() {
       console.log('Usage: tsx src/index.ts <render|render-next|curate|batch|qa|qa-all> [options]');
       console.log('\nCommands:');
       console.log('  render [template] [from] [to] [content] [mood]  - Render a single video');
-      console.log('  render-next [template] [count]                  - Render next unused message(s)');
+      console.log('  render-next [template] [count] [platform]       - Render next unused message(s) for platform');
       console.log('  curate                                           - Select best messages from DB');
       console.log('  batch [template]                                - Curate + render all selected');
       console.log('  qa <video-path> [content]                       - Run QA checks on a video');

@@ -92,13 +92,11 @@ export async function publishNextScheduled(
     for (const target of targets) {
       const targetPlatform = target as 'instagram' | 'tiktok' | 'youtube';
       try {
-        // Skip if already posted on target platform
         const alreadyPosted = await hasPostForMessages(targetPlatform, item.messageIds);
         if (alreadyPosted) {
           console.log(`[publish-job] Skipping cross-post → ${target} (already posted)`);
           continue;
         }
-        // Skip if already queued on target platform
         const alreadyQueued = await hasQueueItemForMessages(targetPlatform, item.messageIds);
         if (alreadyQueued) {
           console.log(`[publish-job] Skipping cross-post → ${target} (already queued)`);
@@ -107,13 +105,13 @@ export async function publishNextScheduled(
 
         const crossPost = await createContentQueueItem({
           videoPath: item.videoPath,
+          coverImagePath: item.coverImagePath ?? undefined,
           messageIds: item.messageIds,
           template: item.template,
           mood: item.mood ?? undefined,
           platform: targetPlatform,
           isExploration: item.isExploration,
         });
-        // Copy caption and hashtags, set as scheduled for now
         await updateContentQueueStatus(crossPost.id, 'scheduled', {
           caption: item.caption ?? undefined,
           hashtags: item.hashtags ?? undefined,

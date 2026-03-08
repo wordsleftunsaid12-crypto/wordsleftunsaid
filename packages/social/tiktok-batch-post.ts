@@ -11,7 +11,7 @@ Sometimes the most meaningful thing you can do is simply show up — no performa
 
 Share yours at wordsleftunsent.com
 
-#wordsleftunsaid #unsentletters #thingsineversaid #unsaidwords #deepquotes #feelings #relatable #poetrycommunity #vulnerability #fyp #foryou`,
+#wordsleftunsent #unsentletters #thingsineversent #unsentwords #deepquotes #feelings #relatable #poetrycommunity #vulnerability #fyp #foryou`,
     mood: 'tender' as const,
   },
   {
@@ -23,7 +23,7 @@ The words we never share are often the ones that matter most. This is your space
 
 Share yours at wordsleftunsent.com
 
-#wordsleftunsaid #unsentletters #thingsineversaid #unsaidwords #anonymousmessages #heartfelt #feelings #relatable #fyp #foryou`,
+#wordsleftunsent #unsentletters #thingsineversent #unsentwords #anonymousmessages #heartfelt #feelings #relatable #fyp #foryou`,
     mood: 'raw' as const,
   },
 ];

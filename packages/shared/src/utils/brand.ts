@@ -19,6 +19,6 @@ export const BRAND = {
     bodyMedium: 500,
   },
   domain: 'wordsleftunsent.com',
-  name: 'Words Left Unsaid',
+  name: 'Words Left Unsent',
   tagline: 'The messages we never sent.',
 } as const;

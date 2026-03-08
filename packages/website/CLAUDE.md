@@ -1,6 +1,6 @@
 # @wlu/website
 
-Astro 4 site for wordsleftunsaid.com. SEO-optimized, server-rendered.
+Astro 4 site for wordsleftunsent.com. SEO-optimized, server-rendered.
 
 ## Structure
 

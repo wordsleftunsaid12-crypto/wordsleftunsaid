@@ -6,7 +6,7 @@ interface Props {
 }
 
 const {
-  title = 'Words Left Unsaid',
+  title = 'Words Left Unsent',
   description = 'Share the messages you never sent. Be heard anonymously.',
   ogImage = '/api/og/default.png',
 } = Astro.props;
@@ -24,7 +24,7 @@ const absoluteOgImage = new URL(ogImage, Astro.site).toString();
     <meta name="description" content={description} />
     <link rel="canonical" href={canonicalUrl} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="alternate" type="application/rss+xml" title="Words Left Unsaid" href="/rss.xml" />
+    <link rel="alternate" type="application/rss+xml" title="Words Left Unsent" href="/rss.xml" />
 
     <!-- Open Graph -->
     <meta property="og:type" content="website" />

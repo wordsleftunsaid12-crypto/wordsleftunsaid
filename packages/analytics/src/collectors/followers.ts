@@ -32,7 +32,7 @@ export async function recordFollowerSnapshot(
  * Scrape follower/following counts from Instagram profile.
  */
 export async function scrapeInstagramFollowerCounts(
-  username: string = 'u.wordsleftunsaid',
+  username: string = 'u.wordsleftunsent',
 ): Promise<{ followers: number; following: number }> {
   ensureDir(IG_BROWSER_DATA_DIR);
 
@@ -258,7 +258,7 @@ export const scrapeFollowerCounts = scrapeInstagramFollowerCounts;
  */
 export async function collectFollowerSnapshot(
   platform: Platform = 'instagram',
-  username: string = 'u.wordsleftunsaid',
+  username: string = 'u.wordsleftunsent',
 ): Promise<void> {
   if (platform === 'tiktok') {
     const counts = await scrapeTikTokFollowerCounts(username);

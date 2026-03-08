@@ -19,7 +19,7 @@ const LIMITS = {
 } as const;
 
 /** Our own account usernames — skip these during outbound engagement */
-const OWN_ACCOUNTS = ['u.wordsleftunsaid', 'wordsleftunsaid'];
+const OWN_ACCOUNTS = ['u.wordsleftunsent', 'wordsleftunsent'];
 
 /**
  * Thoughtful comment templates for different types of content.

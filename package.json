@@ -1,5 +1,5 @@
 {
-  "name": "wordsleftunsaid",
+  "name": "wordsleftunsent",
   "private": true,
   "workspaces": [
     "packages/*"

@@ -12,7 +12,7 @@ const MAX_REPLIES_PER_HOUR = 30;
 const COMMENT_REPLY_MAX_LENGTH = 300;
 
 /** Our Instagram username */
-const OUR_USERNAME = 'u.wordsleftunsaid';
+const OUR_USERNAME = 'u.wordsleftunsent';
 
 /**
  * Fetch new comments from recent Instagram posts via Playwright and store in DB.

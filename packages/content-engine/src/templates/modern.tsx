@@ -258,7 +258,7 @@ export const ModernMessage: React.FC<MessageProps> = ({ from, to, content }) => 
           textTransform: 'uppercase',
         }}
       >
-        words left unsaid
+        words left unsent
       </div>
     </AbsoluteFill>
   );

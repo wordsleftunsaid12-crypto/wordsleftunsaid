@@ -30,7 +30,7 @@ function parseAbbreviatedCount(text: string): number {
 // --- Instagram ---
 
 export async function scrapeInstagramFollowerCounts(
-  username = 'u.wordsleftunsaid',
+  username = 'u.wordsleftunsent',
 ): Promise<FollowerCounts> {
   const { context, page } = await launchInstagram();
   try {
@@ -133,7 +133,7 @@ async function extractTikTokCounts(page: Page): Promise<FollowerCounts> {
 // --- YouTube ---
 
 export async function scrapeYouTubeSubscriberCount(
-  channelHandle = '@WordsLeftUnsaid-v4g',
+  channelHandle = '@WordsLeftUnsent',
 ): Promise<FollowerCounts> {
   const { context, page } = await launchYouTube();
   try {

@@ -19,7 +19,7 @@ const LIMITS = {
 } as const;
 
 /** Our own channel usernames — skip these during outbound engagement */
-const OWN_ACCOUNTS = ['wordsleftunsaid', 'Words Left Unsaid'];
+const OWN_ACCOUNTS = ['wordsleftunsent', 'Words Left Unsent'];
 
 /**
  * Comment templates for YouTube Shorts (natural, slightly longer than TikTok).

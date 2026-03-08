@@ -97,7 +97,7 @@ export function buildOgSvg(to: string, from: string, content: string): string {
   <rect x="0" y="${HEIGHT - 60}" width="${WIDTH}" height="1" fill="${ACCENT}" opacity="0.2" />
 
   <!-- Site name -->
-  <text x="100" y="${HEIGHT - 25}" font-family="system-ui, -apple-system, sans-serif" font-size="14" fill="${TEXT_MUTED}" letter-spacing="2">WORDS LEFT UNSAID</text>
+  <text x="100" y="${HEIGHT - 25}" font-family="system-ui, -apple-system, sans-serif" font-size="14" fill="${TEXT_MUTED}" letter-spacing="2">WORDS LEFT UNSENT</text>
 
   <!-- URL -->
   <text x="${WIDTH - 100}" y="${HEIGHT - 25}" font-family="system-ui, -apple-system, sans-serif" font-size="12" fill="${TEXT_MUTED}" text-anchor="end" opacity="0.6">wordsleftunsent.com</text>
@@ -116,7 +116,7 @@ export function buildDefaultOgSvg(): string {
   <text x="80" y="250" font-family="Georgia, 'Times New Roman', serif" font-size="160" fill="${ACCENT}" opacity="0.1">\u201C</text>
 
   <!-- Main tagline -->
-  <text x="${WIDTH / 2}" y="260" font-family="Georgia, 'Times New Roman', serif" font-size="36" fill="${TEXT_PRIMARY}" text-anchor="middle" letter-spacing="0.5">The words we never said</text>
+  <text x="${WIDTH / 2}" y="260" font-family="Georgia, 'Times New Roman', serif" font-size="36" fill="${TEXT_PRIMARY}" text-anchor="middle" letter-spacing="0.5">The words we never sent</text>
   <text x="${WIDTH / 2}" y="310" font-family="Georgia, 'Times New Roman', serif" font-size="36" fill="${TEXT_PRIMARY}" text-anchor="middle" letter-spacing="0.5">still deserve to be heard.</text>
 
   <!-- Subtitle -->
@@ -132,6 +132,6 @@ export function buildDefaultOgSvg(): string {
   <rect x="0" y="${HEIGHT - 60}" width="${WIDTH}" height="1" fill="${ACCENT}" opacity="0.2" />
 
   <!-- Site name -->
-  <text x="${WIDTH / 2}" y="${HEIGHT - 25}" font-family="system-ui, -apple-system, sans-serif" font-size="14" fill="${TEXT_MUTED}" text-anchor="middle" letter-spacing="2">WORDS LEFT UNSAID</text>
+  <text x="${WIDTH / 2}" y="${HEIGHT - 25}" font-family="system-ui, -apple-system, sans-serif" font-size="14" fill="${TEXT_MUTED}" text-anchor="middle" letter-spacing="2">WORDS LEFT UNSENT</text>
 </svg>`;
 }

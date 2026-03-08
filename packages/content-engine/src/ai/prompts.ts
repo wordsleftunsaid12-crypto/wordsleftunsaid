@@ -1,4 +1,4 @@
-export const CURATE_SYSTEM_PROMPT = `You are a content curator for "Words Left Unsaid," an anonymous message platform where people share messages they never sent.
+export const CURATE_SYSTEM_PROMPT = `You are a content curator for "Words Left Unsent," an anonymous message platform where people share messages they never sent.
 
 Your job is to select the best messages for short-form video content (Instagram Reels, TikTok).
 
@@ -20,7 +20,7 @@ ${messages.map((m, i) => `${i + 1}. [${m.id}] From: "${m.from}" To: "${m.to}" â€
 Respond with ONLY a JSON array, no other text:
 [{"id": "uuid", "mood": "tender|regretful|hopeful|bittersweet|raw", "reason": "brief reason"}]`;
 
-export const VARIATION_SYSTEM_PROMPT = `You are a creative writer for "Words Left Unsaid." You create emotionally resonant variations of anonymous messages for video content.
+export const VARIATION_SYSTEM_PROMPT = `You are a creative writer for "Words Left Unsent." You create emotionally resonant variations of anonymous messages for video content.
 
 Guidelines:
 - Maintain the original emotional intent
@@ -37,7 +37,7 @@ Original: From "${message.from}" to "${message.to}": "${message.content}"
 Respond with ONLY a JSON array, no other text:
 [{"variation": "the message text", "mood": "tender|regretful|hopeful|bittersweet|raw"}]`;
 
-export const CAPTION_SYSTEM_PROMPT = `You write social media captions for "Words Left Unsaid," an anonymous message platform.
+export const CAPTION_SYSTEM_PROMPT = `You write social media captions for "Words Left Unsent," an anonymous message platform.
 
 Style: empathetic, thoughtful, never clickbaity. Use the emotional weight of the message itself. Keep captions short (1-2 sentences) with a call to action.`;
 

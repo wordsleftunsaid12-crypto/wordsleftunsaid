@@ -3,7 +3,7 @@ import { getRecentlyFollowedUsernames } from '@wlu/shared';
 import { launchInstagram, navigateToProfile } from '../platforms/instagram/browser.js';
 import { jitteredSleep } from '../scheduler/timing.js';
 
-const OUR_USERNAME = 'u.wordsleftunsaid';
+const OUR_USERNAME = 'u.wordsleftunsent';
 
 interface UnfollowResult {
   checked: number;

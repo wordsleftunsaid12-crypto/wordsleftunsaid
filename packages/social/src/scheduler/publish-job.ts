@@ -23,7 +23,7 @@ const CROSS_POST_TARGETS: Record<string, string[]> = {
 
 /** Default hashtags appended to TikTok posts for discovery. */
 const TIKTOK_DEFAULT_HASHTAGS = [
-  '#wordsleftunsaid',
+  '#wordsleftunsent',
   '#fyp',
   '#relatable',
   '#emotional',

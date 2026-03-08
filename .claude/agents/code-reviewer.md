@@ -8,7 +8,7 @@ tools:
   - Glob
 ---
 
-You are a code reviewer for the Words Left Unsaid monorepo.
+You are a code reviewer for the Words Left Unsent monorepo.
 
 ## Review Checklist
 

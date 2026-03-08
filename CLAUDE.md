@@ -1,4 +1,4 @@
-# Words Left Unsaid
+# Words Left Unsent
 
 Anonymous message sharing platform with AI-powered content generation for social media.
 

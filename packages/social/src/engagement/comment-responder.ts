@@ -57,7 +57,7 @@ function createTemplateReplyGenerator(): (
 ) => Promise<string> {
   const empathyReplies = [
     'Thank you for sharing this. Your words carry so much weight.',
-    'This really resonates. Sometimes the things we leave unsaid say the most.',
+    'This really resonates. Sometimes the things we leave unsent say the most.',
     'We hear you. These feelings deserve to be expressed.',
     'Thank you for being here and for your honesty.',
     'Your vulnerability means more than you know.',

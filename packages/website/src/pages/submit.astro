@@ -87,7 +87,7 @@ if (Astro.request.method === 'POST') {
 ---
 
 <Base
-  title="Share Your Words | Words Left Unsaid"
+  title="Share Your Words | Words Left Unsent"
   description="Write the message you never sent. Share anonymously."
 >
   <Header />
@@ -178,7 +178,7 @@ if (Astro.request.method === 'POST') {
               var msgUrl = siteUrl + '/messages/' + messageId;
               var truncTo = submittedTo.length > 20 ? submittedTo.slice(0, 20) + '...' : submittedTo;
               var truncContent = submittedContent.length > 80 ? submittedContent.slice(0, 80).trimEnd() + '...' : submittedContent;
-              var shareText = '"To ' + truncTo + '..." \u2014 read it on Words Left Unsaid';
+              var shareText = '"To ' + truncTo + '..." \u2014 read it on Words Left Unsent';
 
               // Set share URLs
               var xLink = document.getElementById('share-x');
@@ -228,7 +228,7 @@ if (Astro.request.method === 'POST') {
                 nativeBtn.style.display = 'inline-flex';
                 nativeBtn.addEventListener('click', function() {
                   trackShareSubmit('native');
-                  navigator.share({ title: 'Words Left Unsaid', text: shareText, url: msgUrl });
+                  navigator.share({ title: 'Words Left Unsent', text: shareText, url: msgUrl });
                 });
               }
             </script>

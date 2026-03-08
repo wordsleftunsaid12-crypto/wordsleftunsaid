@@ -27,7 +27,7 @@ export async function notifyMessageApproved(input: NotifyApprovedInput): Promise
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      sender: { name: 'Words Left Unsaid', email: senderEmail },
+      sender: { name: 'Words Left Unsent', email: senderEmail },
       to: [{ email: input.email }],
       subject: 'Your words are live now.',
       htmlContent: `
@@ -42,7 +42,7 @@ export async function notifyMessageApproved(input: NotifyApprovedInput): Promise
           </p>
           <p style="font-size: 13px; color: #888; line-height: 1.6;">
             Thank you for sharing your words with the world.<br>
-            &mdash; Words Left Unsaid
+            &mdash; Words Left Unsent
           </p>
         </div>
       `,

@@ -25,7 +25,7 @@ try {
   <StructuredData data={{
     '@context': 'https://schema.org',
     '@type': 'WebSite',
-    name: 'Words Left Unsaid',
+    name: 'Words Left Unsent',
     url: Astro.site?.toString(),
     description: 'Share the messages you never sent. Be heard anonymously.',
   }} />
@@ -48,7 +48,7 @@ try {
           <span class="word-reveal">words</span>
           <span class="word-reveal">we</span>
           <span class="word-reveal">never</span>
-          <span class="word-reveal">said</span>
+          <span class="word-reveal">sent</span>
           <br />
           <span class="hero-highlight">
             <span class="word-reveal">still</span>
@@ -74,7 +74,7 @@ try {
       <div class="container">
         <div class="section-header fade-in">
           <h2 class="section-title">{searchQuery ? `Results for "${searchQuery}"` : sort === 'loved' ? 'Most loved' : 'Recent messages'}</h2>
-          <p class="section-subtitle">Words left unsaid, finally given a voice</p>
+          <p class="section-subtitle">Words left unsent, finally given a voice</p>
           {!searchQuery && (
             <div class="sort-toggle">
               <a href="/" class:list={['sort-option', { active: sort === 'recent' }]}>Recent</a>

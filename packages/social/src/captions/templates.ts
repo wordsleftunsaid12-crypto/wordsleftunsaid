@@ -93,7 +93,7 @@ const TEMPLATES: CaptionTemplate[] = [
     moods: ['hopeful', 'tender'],
   },
   {
-    hook: 'I wonder how many of us are carrying the same unsaid words.',
+    hook: 'I wonder how many of us are carrying the same unsent words.',
     body: 'There\u2019s something about reading someone else\u2019s truth that makes your own feel less alone.',
     question: 'Send this to someone who gets it.',
     cta: `Read or write \u2192 ${CTA_LINK}`,
@@ -129,7 +129,7 @@ const TEMPLATES: CaptionTemplate[] = [
   },
   {
     hook: 'The things we don\u2019t say out loud often say the most.',
-    body: 'Words Left Unsaid is a place for the feelings that deserve to be heard, even anonymously.',
+    body: 'Words Left Unsent is a place for the feelings that deserve to be heard, even anonymously.',
     question: 'Tag someone who\u2019d relate.',
     cta: `Share yours \u2192 ${CTA_LINK}`,
     moods: ['tender', 'hopeful', 'bittersweet'],
@@ -192,18 +192,18 @@ export function pickCaptionTemplate(mood: MessageMood): string {
 /** Platform-specific hashtag sets */
 const HASHTAG_SETS: Record<'instagram' | 'tiktok' | 'youtube', string[]> = {
   instagram: [
-    '#wordsleftunsaid', '#unsentletters', '#unsaidwords', '#anonymousmessage',
-    '#thingsineversaid', '#deepfeelings', '#emotionalhealing', '#vulnerability',
+    '#wordsleftunsent', '#unsentletters', '#unsentwords', '#anonymousmessage',
+    '#thingsineversent', '#deepfeelings', '#emotionalhealing', '#vulnerability',
     '#selflove', '#mentalhealthawareness', '#relatablequotes', '#heartbreak',
     '#healing', '#lettertoself', '#writingcommunity',
   ],
   tiktok: [
-    '#wordsleftunsaid', '#fyp', '#relatable', '#emotional', '#unsentletters',
+    '#wordsleftunsent', '#fyp', '#relatable', '#emotional', '#unsentletters',
     '#deepquotes', '#mentalhealthawareness', '#heartbreak', '#healing',
     '#vulnerability', '#viral', '#foryou',
   ],
   youtube: [
-    '#wordsleftunsaid', '#shorts', '#unsentletters', '#emotional',
+    '#wordsleftunsent', '#shorts', '#unsentletters', '#emotional',
     '#relatable', '#deepquotes', '#anonymous', '#healing',
   ],
 };

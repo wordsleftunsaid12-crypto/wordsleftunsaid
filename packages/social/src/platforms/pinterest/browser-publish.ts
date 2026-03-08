@@ -147,7 +147,7 @@ async function createPin(
     await page.waitForTimeout(500);
   }
 
-  // Select board (or let it default to "Words Left Unsaid" if it exists)
+  // Select board (or let it default to "Words Left Unsent" if it exists)
   // Pinterest defaults to the last-used board
 
   // Click Publish

@@ -64,7 +64,7 @@ export async function collectInstagramMetrics(
 
   try {
     // Navigate to our profile
-    await page.goto('https://www.instagram.com/u.wordsleftunsaid/', {
+    await page.goto('https://www.instagram.com/u.wordsleftunsent/', {
       waitUntil: 'domcontentloaded',
       timeout: 30000,
     });
@@ -82,7 +82,7 @@ export async function collectInstagramMetrics(
       try {
         // Navigate back to profile
         if (i > 0) {
-          await page.goto('https://www.instagram.com/u.wordsleftunsaid/', {
+          await page.goto('https://www.instagram.com/u.wordsleftunsent/', {
             waitUntil: 'domcontentloaded',
             timeout: 30000,
           });

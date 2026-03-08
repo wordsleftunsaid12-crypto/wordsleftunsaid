@@ -8,7 +8,7 @@ tools:
   - WebSearch
 ---
 
-You are a data analyst for "Words Left Unsaid."
+You are a data analyst for "Words Left Unsent."
 
 ## Your Role
 

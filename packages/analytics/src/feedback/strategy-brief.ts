@@ -4,7 +4,7 @@ import type { StrategyBrief } from '@wlu/shared';
 import { scoreRecentPosts, generateEngagementSummary } from '../analysis/engagement.js';
 import { analyzeTrends } from '../analysis/trends.js';
 
-const STRATEGY_SYSTEM_PROMPT = `You are a social media strategist for "Words Left Unsaid," an anonymous message platform that creates short-form video content (Reels/TikToks) from real unsent messages.
+const STRATEGY_SYSTEM_PROMPT = `You are a social media strategist for "Words Left Unsent," an anonymous message platform that creates short-form video content (Reels/TikToks) from real unsent messages.
 
 Analyze the performance data provided and generate actionable recommendations. Be specific and data-driven. Your analysis directly controls what content gets created and when it gets posted.`;
 
@@ -109,6 +109,6 @@ function defaultBrief(): StrategyBrief {
     bestPostingHours: [7, 12, 17, 20],
     captionGuidelines: 'Keep captions short (1-2 sentences). Ask a question to drive comments. Use emotional vulnerability.',
     hashtagPerformance: {},
-    engagementInsights: 'No data yet. Focus on building initial content library and engaging with #unsaidwords #unsentletters community.',
+    engagementInsights: 'No data yet. Focus on building initial content library and engaging with #unsentwords #unsentletters community.',
   };
 }

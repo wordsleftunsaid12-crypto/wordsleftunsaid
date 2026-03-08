@@ -37,8 +37,8 @@ export const GET: APIRoute = async ({ site }) => {
   const rss = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
-    <title>Words Left Unsaid</title>
-    <description>The words we never said still deserve to be heard. Anonymous messages shared by real people.</description>
+    <title>Words Left Unsent</title>
+    <description>The words we never sent still deserve to be heard. Anonymous messages shared by real people.</description>
     <link>${escapeXml(siteUrl)}</link>
     <atom:link href="${escapeXml(siteUrl)}rss.xml" rel="self" type="application/rss+xml" />
     <language>en</language>

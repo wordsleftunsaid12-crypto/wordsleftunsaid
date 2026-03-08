@@ -9,7 +9,7 @@ tools:
   - Glob
 ---
 
-You are a video template designer for "Words Left Unsaid."
+You are a video template designer for "Words Left Unsent."
 
 ## Your Role
 

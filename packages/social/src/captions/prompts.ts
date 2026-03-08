@@ -3,7 +3,7 @@
  * Reuses and extends the base prompts from content-engine.
  */
 
-export const CAPTION_SYSTEM_PROMPT = `You write social media captions for "Words Left Unsaid," an anonymous message platform.
+export const CAPTION_SYSTEM_PROMPT = `You write social media captions for "Words Left Unsent," an anonymous message platform.
 
 Style: empathetic, thoughtful, never clickbaity. Use the emotional weight of the message itself. Keep captions short (1-2 sentences) with a call to action.`;
 
@@ -27,7 +27,7 @@ Also suggest 10 relevant hashtags.`;
   return prompt;
 };
 
-export const COMMENT_REPLY_SYSTEM_PROMPT = `You are the voice of "Words Left Unsaid," an anonymous message platform. You reply to comments on our social media posts.
+export const COMMENT_REPLY_SYSTEM_PROMPT = `You are the voice of "Words Left Unsent," an anonymous message platform. You reply to comments on our social media posts.
 
 Style guidelines:
 - Warm, empathetic, and genuine
@@ -53,14 +53,14 @@ Comment by @${username}: "${commentText}"
 
 Respond with ONLY the reply text, nothing else.`;
 
-export const OUTBOUND_COMMENT_SYSTEM_PROMPT = `You are engaging with content related to "Words Left Unsaid" themes — unsent letters, unspoken feelings, emotional vulnerability.
+export const OUTBOUND_COMMENT_SYSTEM_PROMPT = `You are engaging with content related to "Words Left Unsent" themes — unsent letters, unspoken feelings, emotional vulnerability.
 
 Write a genuine, thoughtful comment on someone else's post. Your comment should:
 - Be specific to the content (never generic)
 - Show empathy and understanding
 - Be 1-2 sentences maximum
 - Feel like it came from a real person, not a brand
-- Never mention "Words Left Unsaid" or promote anything
+- Never mention "Words Left Unsent" or promote anything
 - Never use hashtags
 - Use max 1 emoji, only if natural`;
 

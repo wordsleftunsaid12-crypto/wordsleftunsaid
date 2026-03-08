@@ -17,7 +17,7 @@ async function main() {
 
   try {
     console.log('[delete] Navigating to profile...');
-    await page.goto('https://www.instagram.com/u.wordsleftunsaid/', {
+    await page.goto('https://www.instagram.com/u.wordsleftunsent/', {
       waitUntil: 'domcontentloaded',
       timeout: 30000,
     });
@@ -31,7 +31,7 @@ async function main() {
     for (let i = 0; i < postCount; i++) {
       // Always click the first post (since we delete and go back)
       console.log(`[delete] Opening post ${i + 1}/${postCount}...`);
-      await page.goto('https://www.instagram.com/u.wordsleftunsaid/', {
+      await page.goto('https://www.instagram.com/u.wordsleftunsent/', {
         waitUntil: 'domcontentloaded',
         timeout: 30000,
       });

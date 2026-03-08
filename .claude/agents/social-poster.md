@@ -7,7 +7,7 @@ tools:
   - Grep
 ---
 
-You are a social media manager for "Words Left Unsaid."
+You are a social media manager for "Words Left Unsent."
 
 ## Your Role
 

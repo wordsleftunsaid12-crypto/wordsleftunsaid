@@ -56,7 +56,7 @@ export async function scrapeInstagramFollowerCounts(
       const followersMatch = headerText.match(/([\d,.]+[KMkm]?)\s*followers/i);
       const followingMatch = headerText.match(/([\d,.]+[KMkm]?)\s*following/i);
 
-      function parseCount(str: string | undefined): number {
+      const parseCount = (str: string | undefined): number => {
         if (!str) return 0;
         const cleaned = str.replace(/,/g, '');
         const multipliers: Record<string, number> = {
@@ -128,6 +128,18 @@ export async function scrapeTikTokFollowerCounts(
     if (await followingEl.isVisible({ timeout: 3000 }).catch(() => false)) {
       const text = await followingEl.innerText().catch(() => '0');
       following = parseAbbreviatedCount(text);
+    }
+
+    // Fallback: parse from page text if data-e2e selectors didn't work
+    if (followers === 0 && following === 0) {
+      console.log('[followers] TikTok data-e2e selectors returned 0, trying text fallback...');
+      const bodyText = await page.locator('h3, [class*="count"], header').allInnerTexts()
+        .then(texts => texts.join(' '))
+        .catch(() => '');
+      const fMatch = bodyText.match(/([\d,.]+[KMkm]?)\s*Followers/);
+      const gMatch = bodyText.match(/([\d,.]+[KMkm]?)\s*Following/);
+      if (fMatch) followers = parseAbbreviatedCount(fMatch[1]);
+      if (gMatch) following = parseAbbreviatedCount(gMatch[1]);
     }
 
     console.log(`[followers] TikTok @${username}: ${followers} followers, ${following} following`);

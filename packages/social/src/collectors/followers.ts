@@ -96,7 +96,7 @@ async function extractInstagramCounts(page: Page): Promise<FollowerCounts> {
 // --- TikTok ---
 
 export async function scrapeTikTokFollowerCounts(
-  username = 'wordsleftunsaid.com',
+  username = 'u.wordsleftunsaid',
 ): Promise<FollowerCounts> {
   const { context, page } = await launchTikTok();
   try {

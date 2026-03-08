@@ -1,13 +1,16 @@
 ---
+import HeartButton from './HeartButton.astro';
+
 interface Props {
   id: string;
   from: string;
   to: string;
   content: string;
   createdAt: string;
+  likeCount?: number;
 }
 
-const { id, from, to, content, createdAt } = Astro.props;
+const { id, from, to, content, createdAt, likeCount = 0 } = Astro.props;
 
 const date = new Date(createdAt);
 const timeAgo = getTimeAgo(date);
@@ -40,7 +43,10 @@ function getTimeAgo(date: Date): string {
     </blockquote>
     <div class="card-footer">
       <span class="card-from">&mdash; {from}</span>
-      <time class="card-time" datetime={date.toISOString()}>{timeAgo}</time>
+      <div class="card-footer-right">
+        <HeartButton messageId={id} likeCount={likeCount} size="sm" />
+        <time class="card-time" datetime={date.toISOString()}>{timeAgo}</time>
+      </div>
     </div>
   </div>
 </a>
@@ -230,6 +236,12 @@ function getTimeAgo(date: Date): string {
     font-size: 14px;
     color: var(--text-secondary);
     font-style: italic;
+  }
+
+  .card-footer-right {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
   }
 
   .card-time {

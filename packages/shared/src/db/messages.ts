@@ -4,16 +4,18 @@ import type { Message, CreateMessageInput, MessageFilters } from '../types/messa
 const DEFAULT_PAGE_SIZE = 20;
 
 export async function getApprovedMessages(
-  filters: Omit<MessageFilters, 'approved'> = {},
+  filters: Omit<MessageFilters, 'approved'> & { sort?: 'recent' | 'loved' } = {},
 ): Promise<Message[]> {
-  const { limit = DEFAULT_PAGE_SIZE, offset = 0 } = filters;
+  const { limit = DEFAULT_PAGE_SIZE, offset = 0, sort = 'recent' } = filters;
   const client = getAnonClient();
+
+  const orderColumn = sort === 'loved' ? 'like_count' : 'created_at';
 
   const { data, error } = await client
     .from('messages')
     .select('*')
     .eq('approved', true)
-    .order('created_at', { ascending: false })
+    .order(orderColumn, { ascending: false })
     .range(offset, offset + limit - 1);
 
   if (error) throw new Error(`Failed to fetch messages: ${error.message}`);
@@ -62,6 +64,7 @@ export async function createMessage(input: CreateMessageInput): Promise<Message>
     email: input.email || null,
     approved: false,
     created_at: new Date().toISOString(),
+    like_count: 0,
   };
 }
 
@@ -116,6 +119,35 @@ export async function createApprovedMessage(input: CreateMessageInput): Promise<
 
   if (error) throw new Error(`Failed to create approved message: ${error.message}`);
   return data as Message;
+}
+
+// --- Message Likes ---
+
+export async function likeMessage(messageId: string, visitorId: string): Promise<boolean> {
+  const client = getAnonClient();
+
+  const { error } = await client
+    .from('message_likes')
+    .insert({ message_id: messageId, visitor_id: visitorId });
+
+  if (error) {
+    if (error.code === '23505') return false; // Already liked (unique constraint)
+    throw new Error(`Failed to like message: ${error.message}`);
+  }
+  return true;
+}
+
+export async function unlikeMessage(messageId: string, visitorId: string): Promise<boolean> {
+  const client = getAnonClient();
+
+  const { error, count } = await client
+    .from('message_likes')
+    .delete({ count: 'exact' })
+    .eq('message_id', messageId)
+    .eq('visitor_id', visitorId);
+
+  if (error) throw new Error(`Failed to unlike message: ${error.message}`);
+  return (count ?? 0) > 0;
 }
 
 export async function getUnapprovedMessages(): Promise<Message[]> {

@@ -39,6 +39,8 @@ export {
   approveMessage,
   getUnapprovedMessages,
   searchMessages,
+  likeMessage,
+  unlikeMessage,
 } from './db/messages.js';
 
 // Database — Content Queue
@@ -66,11 +68,14 @@ export {
   markCommentReplied,
   recordOutboundEngagement,
   getOutboundEngagementCountToday,
+  getRecentlyFollowedUsernames,
   saveStrategyBrief,
   getLatestStrategyBrief,
   saveFollowerSnapshot,
   getFollowerHistory,
   getScheduleConfig,
+  hasPostForMessages,
+  hasQueueItemForMessages,
 } from './db/posts.js';
 
 // Utils

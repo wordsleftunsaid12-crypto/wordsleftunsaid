@@ -6,6 +6,7 @@ export interface Message {
   email: string | null;
   approved: boolean;
   created_at: string;
+  like_count: number;
 }
 
 export interface CreateMessageInput {

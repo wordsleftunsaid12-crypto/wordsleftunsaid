@@ -6,13 +6,15 @@ import MessageCard from '../components/MessageCard.astro';
 import { getApprovedMessages, searchMessages } from '@wlu/shared';
 
 const searchQuery = Astro.url.searchParams.get('q')?.trim() || '';
+const sortParam = Astro.url.searchParams.get('sort') || '';
+const sort = sortParam === 'loved' ? 'loved' as const : 'recent' as const;
 let messages: Awaited<ReturnType<typeof getApprovedMessages>> = [];
 let error = '';
 
 try {
   messages = searchQuery
     ? await searchMessages(searchQuery, { limit: 30 })
-    : await getApprovedMessages({ limit: 30 });
+    : await getApprovedMessages({ limit: 30, sort });
 } catch (e) {
   error = e instanceof Error ? e.message : 'Failed to load messages';
 }
@@ -63,8 +65,14 @@ try {
     <section id="messages" class="messages-section">
       <div class="container">
         <div class="section-header fade-in">
-          <h2 class="section-title">{searchQuery ? `Results for "${searchQuery}"` : 'Recent messages'}</h2>
+          <h2 class="section-title">{searchQuery ? `Results for "${searchQuery}"` : sort === 'loved' ? 'Most loved' : 'Recent messages'}</h2>
           <p class="section-subtitle">Words left unsaid, finally given a voice</p>
+          {!searchQuery && (
+            <div class="sort-toggle">
+              <a href="/" class:list={['sort-option', { active: sort === 'recent' }]}>Recent</a>
+              <a href="/?sort=loved" class:list={['sort-option', { active: sort === 'loved' }]}>Most loved</a>
+            </div>
+          )}
           <form class="search-form" action="/" method="GET">
             <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
@@ -103,6 +111,7 @@ try {
                 to={msg.to}
                 content={msg.content}
                 createdAt={msg.created_at}
+                likeCount={msg.like_count}
               />
             ))}
           </div>
@@ -596,6 +605,36 @@ try {
     font-size: 14px;
     color: var(--text-muted);
     letter-spacing: 0.5px;
+  }
+
+  /* Sort toggle */
+  .sort-toggle {
+    display: flex;
+    justify-content: center;
+    gap: var(--space-sm);
+    margin-top: var(--space-md);
+  }
+
+  .sort-option {
+    font-family: var(--font-body);
+    font-size: 13px;
+    padding: 6px 16px;
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    text-decoration: none;
+    border: 1px solid transparent;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+  }
+
+  .sort-option:hover {
+    color: var(--text-secondary);
+    border-color: var(--border-subtle);
+  }
+
+  .sort-option.active {
+    color: var(--text-primary);
+    border-color: var(--border-subtle);
+    background: var(--bg-card);
   }
 
   /* Search */

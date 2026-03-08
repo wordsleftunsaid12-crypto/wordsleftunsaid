@@ -1,0 +1,182 @@
+---
+interface Props {
+  messageId: string;
+  likeCount: number;
+  size?: 'sm' | 'lg';
+}
+
+const { messageId, likeCount, size = 'sm' } = Astro.props;
+const iconSize = size === 'lg' ? 20 : 16;
+---
+
+<button
+  class:list={['heart-btn', { 'heart-btn-lg': size === 'lg' }]}
+  data-message-id={messageId}
+  data-liked="false"
+  data-count={likeCount}
+  aria-label={`Like this message (${likeCount} likes)`}
+>
+  <svg class="heart-icon" width={iconSize} height={iconSize} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+  </svg>
+  <span class="heart-count">{likeCount > 0 ? likeCount : ''}</span>
+</button>
+
+<script>
+  function getVisitorId(): string {
+    let id = localStorage.getItem('wlu_visitor_id');
+    if (!id) {
+      id = crypto.randomUUID();
+      localStorage.setItem('wlu_visitor_id', id);
+    }
+    return id;
+  }
+
+  function getLikedMessages(): Set<string> {
+    try {
+      const raw = localStorage.getItem('wlu_liked_messages');
+      return new Set(raw ? JSON.parse(raw) : []);
+    } catch {
+      return new Set();
+    }
+  }
+
+  function setLikedMessages(liked: Set<string>): void {
+    localStorage.setItem('wlu_liked_messages', JSON.stringify([...liked]));
+  }
+
+  // Hydrate heart states from localStorage
+  const likedSet = getLikedMessages();
+  document.querySelectorAll<HTMLButtonElement>('.heart-btn').forEach((btn) => {
+    const msgId = btn.dataset.messageId;
+    if (msgId && likedSet.has(msgId)) {
+      btn.dataset.liked = 'true';
+    }
+  });
+
+  // Event delegation for all heart buttons
+  document.addEventListener('click', async (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.heart-btn');
+    if (!btn) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    const messageId = btn.dataset.messageId;
+    if (!messageId) return;
+
+    const isLiked = btn.dataset.liked === 'true';
+    const countEl = btn.querySelector('.heart-count');
+    const currentCount = parseInt(btn.dataset.count || '0', 10);
+
+    // Optimistic UI
+    const newLiked = !isLiked;
+    const newCount = newLiked ? currentCount + 1 : Math.max(0, currentCount - 1);
+    btn.dataset.liked = String(newLiked);
+    btn.dataset.count = String(newCount);
+    if (countEl) countEl.textContent = newCount > 0 ? String(newCount) : '';
+
+    // Pop animation
+    btn.classList.add('heart-pop');
+    setTimeout(() => btn.classList.remove('heart-pop'), 300);
+
+    // Update localStorage
+    const liked = getLikedMessages();
+    if (newLiked) {
+      liked.add(messageId);
+    } else {
+      liked.delete(messageId);
+    }
+    setLikedMessages(liked);
+
+    // Server sync
+    try {
+      const res = await fetch(`/api/likes/${messageId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          visitor_id: getVisitorId(),
+          action: newLiked ? 'like' : 'unlike',
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        btn.dataset.count = String(data.like_count);
+        if (countEl) countEl.textContent = data.like_count > 0 ? String(data.like_count) : '';
+      } else {
+        // Revert on failure
+        btn.dataset.liked = String(isLiked);
+        btn.dataset.count = String(currentCount);
+        if (countEl) countEl.textContent = currentCount > 0 ? String(currentCount) : '';
+        if (newLiked) liked.delete(messageId); else liked.add(messageId);
+        setLikedMessages(liked);
+      }
+    } catch {
+      // Network error — revert
+      btn.dataset.liked = String(isLiked);
+      btn.dataset.count = String(currentCount);
+      if (countEl) countEl.textContent = currentCount > 0 ? String(currentCount) : '';
+    }
+
+    // GA4
+    if (typeof gtag !== 'undefined') {
+      (gtag as Function)('event', newLiked ? 'message_like' : 'message_unlike', { message_id: messageId });
+    }
+  });
+</script>
+
+<style>
+  .heart-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-body);
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    transition: color 0.15s, transform 0.15s;
+    position: relative;
+    z-index: 2;
+    line-height: 1;
+  }
+
+  .heart-btn:hover {
+    color: var(--mood-love);
+    transform: scale(1.1);
+  }
+
+  .heart-btn[data-liked='true'] {
+    color: var(--mood-love);
+  }
+
+  .heart-btn[data-liked='true'] .heart-icon {
+    fill: var(--mood-love);
+    stroke: var(--mood-love);
+  }
+
+  .heart-btn.heart-pop {
+    animation: heart-pop 0.3s ease-out;
+  }
+
+  .heart-btn-lg {
+    font-size: 15px;
+    gap: 6px;
+    padding: 6px 10px;
+  }
+
+  .heart-count:empty {
+    display: none;
+  }
+
+  @keyframes heart-pop {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.3); }
+    100% { transform: scale(1); }
+  }
+</style>

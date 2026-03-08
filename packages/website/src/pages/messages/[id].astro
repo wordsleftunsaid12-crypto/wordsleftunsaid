@@ -2,6 +2,7 @@
 import Base from '../../layouts/Base.astro';
 import Header from '../../components/Header.astro';
 import Footer from '../../components/Footer.astro';
+import HeartButton from '../../components/HeartButton.astro';
 import { getMessageById } from '@wlu/shared';
 
 const { id } = Astro.params;
@@ -64,9 +65,12 @@ const shareText = `"${truncatedContent}" — Words Left Unsaid`;
 
           <div class="message-meta">
             <span class="message-from">&mdash; {message.from}</span>
-            <time class="message-date" datetime={date.toISOString()}>
-              {formattedDate}
-            </time>
+            <div class="message-meta-right">
+              <HeartButton messageId={id} likeCount={message.like_count} size="lg" />
+              <time class="message-date" datetime={date.toISOString()}>
+                {formattedDate}
+              </time>
+            </div>
           </div>
         </div>
       </article>
@@ -125,29 +129,57 @@ const shareText = `"${truncatedContent}" — Words Left Unsaid`;
   <Footer />
 </Base>
 
-<script>
-  // Copy link
-  const copyBtn = document.getElementById('copy-link');
-  copyBtn?.addEventListener('click', async () => {
-    const url = copyBtn.getAttribute('data-url') || window.location.href;
-    await navigator.clipboard.writeText(url);
-    const textEl = copyBtn.querySelector('.share-btn-text');
-    if (textEl) {
-      const original = textEl.textContent;
-      textEl.textContent = 'Copied!';
-      copyBtn.classList.add('copied');
-      setTimeout(() => {
-        textEl.textContent = original;
-        copyBtn.classList.remove('copied');
-      }, 2000);
+<script is:inline define:vars={{ id }}>
+  // GA4 helper
+  function trackShare(method) {
+    if (typeof gtag !== 'undefined') {
+      gtag('event', 'share_click', { method: method, message_id: id });
     }
+  }
+
+  // Track message view
+  if (typeof gtag !== 'undefined') {
+    gtag('event', 'message_view', { message_id: id });
+  }
+
+  // Copy link
+  var copyBtn = document.getElementById('copy-link');
+  if (copyBtn) {
+    copyBtn.addEventListener('click', function() {
+      var url = copyBtn.getAttribute('data-url') || window.location.href;
+      navigator.clipboard.writeText(url);
+      trackShare('copy_link');
+      var textEl = copyBtn.querySelector('.share-btn-text');
+      if (textEl) {
+        var original = textEl.textContent;
+        textEl.textContent = 'Copied!';
+        copyBtn.classList.add('copied');
+        setTimeout(function() {
+          textEl.textContent = original;
+          copyBtn.classList.remove('copied');
+        }, 2000);
+      }
+    });
+  }
+
+  // X/Twitter share tracking
+  var xLinks = document.querySelectorAll('a[href*="twitter.com/intent"]');
+  xLinks.forEach(function(link) {
+    link.addEventListener('click', function() { trackShare('twitter'); });
+  });
+
+  // Facebook share tracking
+  var fbLinks = document.querySelectorAll('a[href*="facebook.com/sharer"]');
+  fbLinks.forEach(function(link) {
+    link.addEventListener('click', function() { trackShare('facebook'); });
   });
 
   // Native share API
-  const nativeBtn = document.getElementById('native-share');
+  var nativeBtn = document.getElementById('native-share');
   if (navigator.share && nativeBtn) {
     nativeBtn.style.display = 'inline-flex';
-    nativeBtn.addEventListener('click', () => {
+    nativeBtn.addEventListener('click', function() {
+      trackShare('native');
       navigator.share({
         title: nativeBtn.getAttribute('data-title') || '',
         text: nativeBtn.getAttribute('data-text') || '',
@@ -249,6 +281,12 @@ const shareText = `"${truncatedContent}" — Words Left Unsaid`;
     font-size: 14px;
     color: var(--text-secondary);
     font-style: italic;
+  }
+
+  .message-meta-right {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
   }
 
   .message-date {

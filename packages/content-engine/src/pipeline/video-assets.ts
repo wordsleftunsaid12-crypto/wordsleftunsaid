@@ -24,47 +24,34 @@ const recentlyUsedClips: string[] = [];
 const recentlyUsedTracks: string[] = [];
 
 /**
- * Select a random background video clip matching the given mood.
- * Avoids repeating recently used clips within the same session.
- * Falls back to any available clip if no mood-specific clips exist.
+ * Select a random background video clip.
+ * Pools ALL clips across all mood directories for maximum variety,
+ * and avoids repeats within a batch (via recentlyUsedClips).
  */
-export function selectBackgroundVideo(mood: MessageMood): string {
-  const moodDir = path.join(ASSETS_DIR, mood);
+export function selectBackgroundVideo(_mood: MessageMood): string {
+  // Collect every clip across all mood directories
+  const allClips: string[] = [];
+  const dirs = fs.readdirSync(ASSETS_DIR).filter((d) => {
+    const full = path.join(ASSETS_DIR, d);
+    return fs.statSync(full).isDirectory();
+  });
 
-  let clips: string[] = [];
-
-  if (fs.existsSync(moodDir)) {
-    clips = fs
-      .readdirSync(moodDir)
+  for (const d of dirs) {
+    const dir = path.join(ASSETS_DIR, d);
+    const found = fs
+      .readdirSync(dir)
       .filter((f) => f.endsWith('.mp4'))
-      .map((f) => path.join(moodDir, f));
+      .map((f) => path.join(dir, f));
+    allClips.push(...found);
   }
 
-  // Fallback: pick from any mood directory
-  if (clips.length === 0) {
-    const allMoods = fs.readdirSync(ASSETS_DIR).filter((d) => {
-      const full = path.join(ASSETS_DIR, d);
-      return fs.statSync(full).isDirectory();
-    });
-
-    for (const m of allMoods) {
-      const dir = path.join(ASSETS_DIR, m);
-      const found = fs
-        .readdirSync(dir)
-        .filter((f) => f.endsWith('.mp4'))
-        .map((f) => path.join(dir, f));
-      clips.push(...found);
-    }
-  }
-
-  if (clips.length === 0) {
+  if (allClips.length === 0) {
     throw new Error(`No background video clips found in ${ASSETS_DIR}`);
   }
 
   // Filter out recently used clips to avoid repeats in a batch
-  const available = clips.filter((c) => !recentlyUsedClips.includes(c));
-  // If all clips have been used, reset history and allow any
-  const pool = available.length > 0 ? available : clips;
+  const available = allClips.filter((c) => !recentlyUsedClips.includes(c));
+  const pool = available.length > 0 ? available : allClips;
 
   const selected = pool[Math.floor(Math.random() * pool.length)];
   recentlyUsedClips.push(selected);
@@ -73,44 +60,33 @@ export function selectBackgroundVideo(mood: MessageMood): string {
 }
 
 /**
- * Select a random background music track matching the given mood.
- * Mirrors selectBackgroundVideo() — avoids repeats within a batch.
- * Falls back to any mood directory if no mood-specific tracks exist.
+ * Select a random background music track.
+ * Pools ALL tracks across all mood directories for maximum variety,
+ * and avoids repeats within a batch (via recentlyUsedTracks).
  */
-export function selectBackgroundMusic(mood: MessageMood): string | null {
-  const moodDir = path.join(MUSIC_DIR, mood);
+export function selectBackgroundMusic(_mood: MessageMood): string | null {
+  if (!fs.existsSync(MUSIC_DIR)) return null;
 
-  let tracks: string[] = [];
+  // Collect every track across all mood directories
+  const allTracks: string[] = [];
+  const dirs = fs.readdirSync(MUSIC_DIR).filter((d) => {
+    const full = path.join(MUSIC_DIR, d);
+    return fs.statSync(full).isDirectory();
+  });
 
-  if (fs.existsSync(moodDir)) {
-    tracks = fs
-      .readdirSync(moodDir)
+  for (const d of dirs) {
+    const dir = path.join(MUSIC_DIR, d);
+    const found = fs
+      .readdirSync(dir)
       .filter((f) => f.endsWith('.mp3'))
-      .map((f) => path.join(moodDir, f));
+      .map((f) => path.join(dir, f));
+    allTracks.push(...found);
   }
 
-  // Fallback: pick from any mood directory
-  if (tracks.length === 0) {
-    if (!fs.existsSync(MUSIC_DIR)) return null;
-    const allMoods = fs.readdirSync(MUSIC_DIR).filter((d) => {
-      const full = path.join(MUSIC_DIR, d);
-      return fs.statSync(full).isDirectory();
-    });
+  if (allTracks.length === 0) return null;
 
-    for (const m of allMoods) {
-      const dir = path.join(MUSIC_DIR, m);
-      const found = fs
-        .readdirSync(dir)
-        .filter((f) => f.endsWith('.mp3'))
-        .map((f) => path.join(dir, f));
-      tracks.push(...found);
-    }
-  }
-
-  if (tracks.length === 0) return null;
-
-  const available = tracks.filter((t) => !recentlyUsedTracks.includes(t));
-  const pool = available.length > 0 ? available : tracks;
+  const available = allTracks.filter((t) => !recentlyUsedTracks.includes(t));
+  const pool = available.length > 0 ? available : allTracks;
 
   const selected = pool[Math.floor(Math.random() * pool.length)];
   recentlyUsedTracks.push(selected);

@@ -53,6 +53,28 @@ export async function createContentQueueItem(
 ): Promise<ContentQueueItem> {
   const client = getServiceClient();
 
+  // Check for existing queue item with the same message IDs to prevent duplicates
+  if (input.messageIds.length > 0) {
+    const { data: existing } = await client
+      .from('content_queue')
+      .select('id, message_ids')
+      .not('message_ids', 'eq', '{}');
+
+    const inputKey = JSON.stringify([...input.messageIds].sort());
+    const dupe = (existing ?? []).find((row) => {
+      const rowKey = JSON.stringify([...(row.message_ids as string[])].sort());
+      return rowKey === inputKey;
+    });
+
+    if (dupe) {
+      // Update existing item instead of creating a duplicate
+      return updateContentQueueStatus(dupe.id as string, 'pending', {
+        videoPath: input.videoPath,
+        coverImagePath: input.coverImagePath,
+      });
+    }
+  }
+
   const { data, error } = await client
     .from('content_queue')
     .insert({

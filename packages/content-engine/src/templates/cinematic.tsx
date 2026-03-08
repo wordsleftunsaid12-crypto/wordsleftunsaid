@@ -118,12 +118,12 @@ export const CinematicMessage: React.FC<CinematicProps> = ({
     easing: Easing.out(Easing.cubic),
   });
 
-  // --- CTA overlay (fades in during "From" hold phase) ---
-  const ctaOverlayStart = fromFullyVisible + 10;
-  const ctaOverlayOpacity = interpolate(
+  // --- CTA (fades in with the "From" label, reaches full opacity quickly) ---
+  const ctaFadeStart = fromDelay;
+  const ctaOpacity = interpolate(
     frame,
-    [ctaOverlayStart, ctaOverlayStart + 15],
-    [0, 0.85],
+    [ctaFadeStart, ctaFadeStart + 20],
+    [0, 1],
     { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
   );
 
@@ -133,17 +133,9 @@ export const CinematicMessage: React.FC<CinematicProps> = ({
     extrapolateRight: 'clamp',
   });
 
-  // --- CTA (full opacity after message fades, holds to end) ---
-  const ctaFullOpacity = interpolate(
-    frame,
-    [ctaStart, ctaStart + 10],
-    [ctaOverlayOpacity, 1],
-    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
-  );
-  const ctaOpacity = frame >= ctaStart ? ctaFullOpacity : ctaOverlayOpacity;
   const ctaSlide = interpolate(
     frame,
-    [ctaOverlayStart, ctaOverlayStart + 18],
+    [ctaFadeStart, ctaFadeStart + 18],
     [20, 0],
     { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: Easing.out(Easing.cubic) },
   );
@@ -350,13 +342,13 @@ export const CinematicMessage: React.FC<CinematicProps> = ({
         />
       </div>
 
-      {/* CTA — overlays during "From" hold, then stays after message fades */}
+      {/* CTA — appears with "From" label, stays visible to end */}
       <div
         style={{
           position: 'absolute',
           left: 0,
           right: 0,
-          bottom: isVertical ? 350 : 120,
+          bottom: isVertical ? 280 : 100,
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
@@ -367,12 +359,12 @@ export const CinematicMessage: React.FC<CinematicProps> = ({
         <div
           style={{
             fontFamily: 'Poppins, sans-serif',
-            fontSize: isVertical ? 26 : 20,
+            fontSize: isVertical ? 30 : 22,
             fontWeight: 300,
-            color: 'rgba(200, 168, 130, 0.9)',
+            color: 'rgba(220, 190, 150, 1)',
             letterSpacing: '3px',
             textAlign: 'center',
-            textShadow: '0 2px 15px rgba(0, 0, 0, 0.6)',
+            textShadow: '0 2px 20px rgba(0, 0, 0, 0.8)',
           }}
         >
           Share your unsent message
@@ -380,12 +372,12 @@ export const CinematicMessage: React.FC<CinematicProps> = ({
         <div
           style={{
             fontFamily: 'Georgia, "Times New Roman", serif',
-            fontSize: isVertical ? 36 : 28,
+            fontSize: isVertical ? 42 : 32,
             fontWeight: 400,
-            color: '#f0e8e0',
+            color: '#ffffff',
             marginTop: isVertical ? 16 : 10,
             letterSpacing: '2px',
-            textShadow: '0 2px 15px rgba(0, 0, 0, 0.6)',
+            textShadow: '0 2px 20px rgba(0, 0, 0, 0.8)',
           }}
         >
           wordsleftunsaid.netlify.app

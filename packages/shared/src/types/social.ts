@@ -1,4 +1,4 @@
-export type Platform = 'instagram' | 'tiktok' | 'youtube';
+export type Platform = 'instagram' | 'tiktok' | 'youtube' | 'reddit' | 'pinterest' | 'twitter' | 'threads';
 export type PostStatus = 'pending' | 'qa_passed' | 'captioned' | 'scheduled' | 'posted' | 'failed';
 export type PostType = 'reel' | 'feed' | 'carousel' | 'story';
 export type OutboundActionType = 'like' | 'follow' | 'comment';

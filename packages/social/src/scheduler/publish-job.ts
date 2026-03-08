@@ -12,6 +12,11 @@ const CROSS_POST_TARGETS: Record<string, string[]> = {
   instagram: ['tiktok', 'youtube'],
   tiktok: ['instagram', 'youtube'],
   youtube: ['instagram', 'tiktok'],
+  // Text platforms don't auto-cross-post to video platforms (different content format)
+  reddit: [],
+  pinterest: [],
+  twitter: ['threads'],
+  threads: ['twitter'],
 };
 
 /** CTA domain kept clean — no UTM params in captions (users type URLs manually). */
@@ -31,7 +36,7 @@ const TIKTOK_DEFAULT_HASHTAGS = [
  * Check for the next scheduled item and publish it if due.
  */
 export async function publishNextScheduled(
-  options: { platform?: 'instagram' | 'tiktok' | 'youtube'; dryRun?: boolean } = {},
+  options: { platform?: 'instagram' | 'tiktok' | 'youtube' | 'reddit' | 'pinterest' | 'twitter' | 'threads'; dryRun?: boolean } = {},
 ): Promise<boolean> {
   const { platform = 'instagram', dryRun = false } = options;
 
@@ -81,6 +86,26 @@ export async function publishNextScheduled(
         '../platforms/youtube/browser-publish.js'
       );
       result = await browserPublishYouTubeShort(publishOptions);
+    } else if (platform === 'reddit') {
+      const { browserPublishReddit } = await import(
+        '../platforms/reddit/browser-publish.js'
+      );
+      result = await browserPublishReddit(publishOptions);
+    } else if (platform === 'pinterest') {
+      const { browserPublishPinterest } = await import(
+        '../platforms/pinterest/browser-publish.js'
+      );
+      result = await browserPublishPinterest(publishOptions);
+    } else if (platform === 'twitter') {
+      const { browserPublishTwitter } = await import(
+        '../platforms/twitter/browser-publish.js'
+      );
+      result = await browserPublishTwitter(publishOptions);
+    } else if (platform === 'threads') {
+      const { browserPublishThreads } = await import(
+        '../platforms/threads/browser-publish.js'
+      );
+      result = await browserPublishThreads(publishOptions);
     } else {
       result = await browserPublishReel(publishOptions);
     }
@@ -90,7 +115,7 @@ export async function publishNextScheduled(
     // Cross-post: queue the same video for other platforms (with dedup)
     const targets = CROSS_POST_TARGETS[platform] ?? [];
     for (const target of targets) {
-      const targetPlatform = target as 'instagram' | 'tiktok' | 'youtube';
+      const targetPlatform = target as import('@wlu/shared').Platform;
       try {
         const alreadyPosted = await hasPostForMessages(targetPlatform, item.messageIds);
         if (alreadyPosted) {

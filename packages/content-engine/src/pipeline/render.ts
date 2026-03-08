@@ -1,5 +1,5 @@
 import { bundle } from '@remotion/bundler';
-import { renderMedia, selectComposition } from '@remotion/renderer';
+import { renderMedia, renderStill, selectComposition } from '@remotion/renderer';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -90,4 +90,36 @@ export async function renderVideo(options: RenderOptions): Promise<string> {
 
   console.log(`Video saved to: ${outputPath}`);
   return outputPath;
+}
+
+/**
+ * Render a single frame as a PNG cover image (for thumbnails).
+ * Frame 0 contains the hook text, making it an effective scroll-stopping thumbnail.
+ */
+export async function renderCoverFrame(options: {
+  compositionId: CompositionId;
+  props: Record<string, unknown>;
+  outputPath: string;
+  frame?: number;
+}): Promise<string> {
+  const bundled = await ensureBundle();
+
+  const composition = await selectComposition({
+    serveUrl: bundled,
+    id: options.compositionId,
+    inputProps: options.props,
+  });
+
+  console.log(`Rendering cover frame ${options.frame ?? 0}...`);
+  await renderStill({
+    composition,
+    serveUrl: bundled,
+    output: options.outputPath,
+    frame: options.frame ?? 0,
+    inputProps: options.props,
+    imageFormat: 'png',
+  });
+
+  console.log(`Cover frame saved to: ${options.outputPath}`);
+  return options.outputPath;
 }

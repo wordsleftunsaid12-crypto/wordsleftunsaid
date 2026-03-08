@@ -1,4 +1,4 @@
-export type Platform = 'instagram' | 'tiktok';
+export type Platform = 'instagram' | 'tiktok' | 'youtube';
 export type PostStatus = 'pending' | 'qa_passed' | 'captioned' | 'scheduled' | 'posted' | 'failed';
 export type PostType = 'reel' | 'feed' | 'carousel' | 'story';
 export type OutboundActionType = 'like' | 'follow' | 'comment';
@@ -30,6 +30,7 @@ export interface Post {
 export interface ContentQueueItem {
   id: string;
   videoPath: string;
+  coverImagePath: string | null;
   messageIds: string[];
   template: string;
   mood: string | null;
@@ -46,6 +47,7 @@ export interface ContentQueueItem {
 
 export interface CreateContentQueueInput {
   videoPath: string;
+  coverImagePath?: string;
   messageIds: string[];
   template: string;
   mood?: string;
@@ -78,6 +80,7 @@ export interface ScheduleConfig {
 
 export interface OutboundEngagement {
   id: string;
+  platform: Platform;
   actionType: OutboundActionType;
   targetUsername: string;
   targetPostUrl: string | null;

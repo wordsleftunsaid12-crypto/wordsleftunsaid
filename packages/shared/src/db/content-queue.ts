@@ -12,6 +12,7 @@ function mapRow(row: Record<string, unknown>): ContentQueueItem {
   return {
     id: row.id as string,
     videoPath: row.video_path as string,
+    coverImagePath: row.cover_image_path as string | null,
     messageIds: (row.message_ids as string[]) ?? [],
     template: row.template as string,
     mood: row.mood as string | null,
@@ -56,6 +57,7 @@ export async function createContentQueueItem(
     .from('content_queue')
     .insert({
       video_path: input.videoPath,
+      cover_image_path: input.coverImagePath ?? null,
       message_ids: input.messageIds,
       template: input.template,
       mood: input.mood ?? null,
@@ -72,7 +74,7 @@ export async function createContentQueueItem(
 export async function updateContentQueueStatus(
   id: string,
   status: PostStatus,
-  extra: { caption?: string; hashtags?: string[]; scheduledFor?: string; errorMessage?: string; videoPath?: string } = {},
+  extra: { caption?: string; hashtags?: string[]; scheduledFor?: string; errorMessage?: string; videoPath?: string; coverImagePath?: string } = {},
 ): Promise<ContentQueueItem> {
   const client = getServiceClient();
 
@@ -85,6 +87,7 @@ export async function updateContentQueueStatus(
   if (extra.scheduledFor !== undefined) update.scheduled_for = extra.scheduledFor;
   if (extra.errorMessage !== undefined) update.error_message = extra.errorMessage;
   if (extra.videoPath !== undefined) update.video_path = extra.videoPath;
+  if (extra.coverImagePath !== undefined) update.cover_image_path = extra.coverImagePath;
 
   const { data, error } = await client
     .from('content_queue')

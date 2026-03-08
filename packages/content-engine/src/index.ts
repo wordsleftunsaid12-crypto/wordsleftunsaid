@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { renderVideo, isCinematic, ensureBundle, copyToBundle } from './pipeline/render.js';
+import { renderVideo, renderCoverFrame, isCinematic, ensureBundle, copyToBundle } from './pipeline/render.js';
 import type { CompositionId } from './pipeline/render.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -65,6 +65,14 @@ async function main() {
         compositionId: template,
         props: { from, to, content, backgroundVideo },
         outputPath,
+      });
+
+      // Generate cover frame (frame 0 has hook text for thumbnail)
+      const coverPath = outputPath.replace('.mp4', '-cover.png');
+      await renderCoverFrame({
+        compositionId: template,
+        props: { from, to, content, backgroundVideo },
+        outputPath: coverPath,
       });
 
       console.log('\nDone!');
@@ -177,16 +185,26 @@ async function main() {
           backgroundVideo = await prepareBgVideo(mood, template);
         }
 
+        const renderProps = { from: msg.from, to: msg.to, content: msg.content, backgroundVideo };
         await renderVideo({
           compositionId: template,
-          props: { from: msg.from, to: msg.to, content: msg.content, backgroundVideo },
+          props: renderProps,
           outputPath,
+        });
+
+        // Generate cover frame
+        const coverPath = outputPath.replace('.mp4', '-cover.png');
+        await renderCoverFrame({
+          compositionId: template,
+          props: renderProps,
+          outputPath: coverPath,
         });
 
         // Record the message ID in the content queue so it won't be picked again
         const { createContentQueueItem } = await import('@wlu/shared');
         await createContentQueueItem({
           videoPath: outputPath,
+          coverImagePath: coverPath,
           messageIds: [msg.id],
           template,
           mood,
@@ -207,15 +225,16 @@ async function main() {
         updateContentQueueStatus,
       } = await import('@wlu/shared');
 
-      console.log('\nFetching pending queue items for re-render...');
-      const pendingItems = await getContentQueue({ status: 'pending' });
+      const rerenderStatus = (process.argv[3] || 'pending') as 'pending' | 'scheduled';
+      console.log(`\nFetching ${rerenderStatus} queue items for re-render...`);
+      const pendingItems = await getContentQueue({ status: rerenderStatus });
 
       if (pendingItems.length === 0) {
-        console.log('No pending items to re-render.');
+        console.log(`No ${rerenderStatus} items to re-render.`);
         break;
       }
 
-      console.log(`Found ${pendingItems.length} pending item(s). Re-rendering...\n`);
+      console.log(`Found ${pendingItems.length} ${rerenderStatus} item(s). Re-rendering...\n`);
 
       for (const item of pendingItems) {
         // Fetch the original message content
@@ -252,14 +271,23 @@ async function main() {
           backgroundVideo = await prepareBgVideo(mood, template);
         }
 
+        const renderProps = { from: msgFrom, to: msgTo, content: msgContent, backgroundVideo };
         await renderVideo({
           compositionId: template,
-          props: { from: msgFrom, to: msgTo, content: msgContent, backgroundVideo },
+          props: renderProps,
           outputPath: newOutputPath,
         });
 
-        // Update the queue item with new video path, keep status as pending
-        await updateContentQueueStatus(item.id, 'pending', { videoPath: newOutputPath });
+        // Generate cover frame
+        const newCoverPath = newOutputPath.replace('.mp4', '-cover.png');
+        await renderCoverFrame({
+          compositionId: template,
+          props: renderProps,
+          outputPath: newCoverPath,
+        });
+
+        // Update the queue item with new video + cover path, preserve original status
+        await updateContentQueueStatus(item.id, rerenderStatus, { videoPath: newOutputPath, coverImagePath: newCoverPath });
         console.log(`    Updated queue item → ${path.basename(newOutputPath)}\n`);
       }
 

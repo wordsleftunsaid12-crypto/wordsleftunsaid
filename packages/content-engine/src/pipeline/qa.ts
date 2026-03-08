@@ -92,15 +92,15 @@ async function getVideoMetadata(videoPath: string): Promise<VideoMetadata> {
 
 // ─── Timing Computation (mirrors cinematic.tsx logic) ────────────────────────
 
-export function computeTimingParams(content: string, durationInFrames: number = 300): TimingParams {
+export function computeTimingParams(content: string, durationInFrames: number = 240): TimingParams {
   const words = content.split(' ');
-  const contentDelay = 35;
+  const contentDelay = 15;
 
   // Mirrors adaptive timing from cinematic.tsx
-  const FROM_GAP = 15;
-  const FROM_FADE_IN = 22;
-  const FADE_OUT = 25;
-  const CTA_RESERVE = 45;
+  const FROM_GAP = 10;
+  const FROM_FADE_IN = 15;
+  const FADE_OUT = 18;
+  const CTA_RESERVE = 30;
   const fixedOverhead = FROM_GAP + FROM_FADE_IN + FADE_OUT + CTA_RESERVE;
 
   const budget = durationInFrames - contentDelay - fixedOverhead;
@@ -156,9 +156,10 @@ async function extractKeyFrames(
   }
 
   const frames: Array<{ label: string; frameNumber: number }> = [
+    { label: 'hook-text', frameNumber: 0 },
     { label: 'message-peak', frameNumber: timing.contentFadeOutStart - 30 },
-    { label: 'from-visible', frameNumber: timing.fromDelay + 35 },
-    { label: 'cta-visible', frameNumber: timing.ctaStart + 15 },
+    { label: 'from-visible', frameNumber: timing.fromDelay + 20 },
+    { label: 'cta-visible', frameNumber: timing.ctaStart + 10 },
   ];
 
   const captures: FrameCapture[] = [];
@@ -206,8 +207,8 @@ function runMetadataChecks(metadata: VideoMetadata, template: string): QACheck[]
     },
     {
       name: 'duration',
-      passed: metadata.durationSec >= 9.0 && metadata.durationSec <= 11.0,
-      expected: '9.0-11.0s',
+      passed: metadata.durationSec >= 7.0 && metadata.durationSec <= 9.0,
+      expected: '7.0-9.0s',
       actual: `${metadata.durationSec.toFixed(1)}s`,
     },
     {

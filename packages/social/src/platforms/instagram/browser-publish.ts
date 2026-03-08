@@ -16,6 +16,7 @@ interface BrowserPublishResult {
  */
 export async function browserPublishReel(options: {
   videoPath: string;
+  coverImagePath?: string;
   caption: string;
   contentQueueId?: string;
   messageIds?: string[];
@@ -52,7 +53,10 @@ export async function browserPublishReel(options: {
 
     // Create the Reel
     console.log('[browser-publish] Starting Reel creation...');
-    await createReelPost(page, absoluteVideoPath, options.caption);
+    const absoluteCoverPath = options.coverImagePath
+      ? resolve(options.coverImagePath)
+      : undefined;
+    await createReelPost(page, absoluteVideoPath, options.caption, absoluteCoverPath);
 
     console.log('[browser-publish] Reel posted successfully!');
 
@@ -88,6 +92,7 @@ async function createReelPost(
   page: Page,
   videoPath: string,
   caption: string,
+  coverImagePath?: string,
 ): Promise<void> {
   // 1. Click "Create" in the sidebar to expand the submenu
   console.log('[browser-publish] Clicking Create in sidebar...');
@@ -165,7 +170,43 @@ async function createReelPost(
   await clickNext(page);
   await page.waitForTimeout(3000);
 
-  // 5. Add caption
+  // 5. Set cover image if provided
+  if (coverImagePath && existsSync(coverImagePath)) {
+    try {
+      console.log('[browser-publish] Setting cover image...');
+      const editCover = page.getByText('Edit cover', { exact: false }).first();
+      if (await editCover.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await editCover.click();
+        await page.waitForTimeout(2000);
+
+        // Click "Add from camera roll" to upload a custom cover
+        const addFromRoll = page.getByText('Add from camera roll', { exact: false })
+          .or(page.getByText('Upload cover photo', { exact: false }))
+          .first();
+        if (await addFromRoll.isVisible({ timeout: 3000 }).catch(() => false)) {
+          const [coverChooser] = await Promise.all([
+            page.waitForEvent('filechooser', { timeout: 10000 }),
+            addFromRoll.click(),
+          ]);
+          await coverChooser.setFiles(coverImagePath);
+          console.log(`[browser-publish] Cover image set: ${basename(coverImagePath)}`);
+          await page.waitForTimeout(3000);
+
+          // Confirm the cover selection
+          const doneBtn = page.getByRole('button', { name: /^Done$/i })
+            .or(page.locator('div[role="button"]').filter({ hasText: /^Done$/ }));
+          if (await doneBtn.first().isVisible({ timeout: 3000 }).catch(() => false)) {
+            await doneBtn.first().click({ force: true });
+            await page.waitForTimeout(2000);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[browser-publish] Cover image upload failed, continuing without it:', err instanceof Error ? err.message : err);
+    }
+  }
+
+  // 6. Add caption
   console.log('[browser-publish] Adding caption...');
   const captionInput = page
     .locator('[aria-label="Write a caption..."]')

@@ -26,16 +26,23 @@ export const CinematicMessage: React.FC<CinematicProps> = ({
   const { height, durationInFrames } = useVideoConfig();
   const isVertical = height > 1200;
 
-  // --- Animation timing (adaptive to composition duration) ---
-  const toDelay = 15;
-  const contentDelay = 35;
+  // --- Animation timing (compressed for faster hook) ---
+  const toDelay = 5;
+  const contentDelay = 15;
   const words = content.split(' ');
 
-  // Fixed overhead frames: gap before "from" + from fade-in + fade-out + CTA
-  const FROM_GAP = 15;
-  const FROM_FADE_IN = 22;
-  const FADE_OUT = 25;
-  const CTA_RESERVE = 45; // CTA needs 1.5s to fade in and be visible
+  // Hook text: first ~5 words + "..." (visible on frame 0 for thumbnail)
+  const hookWordCount = Math.min(5, Math.ceil(words.length / 3));
+  const hookText =
+    words.length <= hookWordCount
+      ? content
+      : words.slice(0, hookWordCount).join(' ') + '...';
+
+  // Fixed overhead frames
+  const FROM_GAP = 10;
+  const FROM_FADE_IN = 15;
+  const FADE_OUT = 18;
+  const CTA_RESERVE = 30;
   const fixedOverhead = FROM_GAP + FROM_FADE_IN + FADE_OUT + CTA_RESERVE;
 
   // Budget for word reveal + from-visible pause
@@ -62,25 +69,31 @@ export const CinematicMessage: React.FC<CinematicProps> = ({
   const contentFadeOutEnd = contentFadeOutStart + FADE_OUT;
   const ctaStart = contentFadeOutEnd;
 
-  // --- Dark overlay fade in (let video breathe initially) ---
-  const overlayOpacity = interpolate(frame, [0, 20], [0.3, 1], {
+  // --- Hook text (visible immediately, fully gone before word reveal starts) ---
+  const hookOpacity = interpolate(frame, [0, 5, 8, contentDelay - 1], [1, 1, 0.8, 0], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  });
+
+  // --- Dark overlay (faster fade-in — 8 frames instead of 20) ---
+  const overlayOpacity = interpolate(frame, [0, 8], [0.5, 1], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
 
   // --- Accent line ---
-  const lineWidth = interpolate(frame, [8, 45], [0, isVertical ? 180 : 150], {
+  const lineWidth = interpolate(frame, [3, 25], [0, isVertical ? 180 : 150], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
     easing: Easing.out(Easing.cubic),
   });
 
-  // --- "To" label ---
-  const toOpacity = interpolate(frame, [toDelay, toDelay + 18], [0, 1], {
+  // --- "To" label (faster — starts at frame 5) ---
+  const toOpacity = interpolate(frame, [toDelay, toDelay + 10], [0, 1], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
-  const toSlide = interpolate(frame, [toDelay, toDelay + 22], [25, 0], {
+  const toSlide = interpolate(frame, [toDelay, toDelay + 12], [20, 0], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
     easing: Easing.out(Easing.cubic),
@@ -99,37 +112,39 @@ export const CinematicMessage: React.FC<CinematicProps> = ({
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
-  const fromSlide = interpolate(frame, [fromDelay, fromDelay + 26], [15, 0], {
+  const fromSlide = interpolate(frame, [fromDelay, fromDelay + 18], [12, 0], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
     easing: Easing.out(Easing.cubic),
   });
 
-  // --- Content fade out (message, labels, lines) ---
+  // --- CTA overlay (fades in during "From" hold phase) ---
+  const ctaOverlayStart = fromFullyVisible + 10;
+  const ctaOverlayOpacity = interpolate(
+    frame,
+    [ctaOverlayStart, ctaOverlayStart + 15],
+    [0, 0.85],
+    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
+  );
+
+  // --- Content fade out (message, labels, lines — but CTA stays) ---
   const contentFadeOut = interpolate(frame, [contentFadeOutStart, contentFadeOutEnd], [1, 0], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
 
-  // --- Branding ---
-  const brandOpacity = interpolate(
+  // --- CTA (full opacity after message fades, holds to end) ---
+  const ctaFullOpacity = interpolate(
     frame,
-    [80, 100, contentFadeOutStart - 5, contentFadeOutStart + 15],
-    [0, 0.5, 0.5, 0],
+    [ctaStart, ctaStart + 10],
+    [ctaOverlayOpacity, 1],
     { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
   );
-
-  // --- CTA (fades in after message is gone, then stays) ---
-  const ctaOpacity = interpolate(
-    frame,
-    [ctaStart, ctaStart + 15],
-    [0, 1],
-    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
-  );
+  const ctaOpacity = frame >= ctaStart ? ctaFullOpacity : ctaOverlayOpacity;
   const ctaSlide = interpolate(
     frame,
-    [ctaStart, ctaStart + 18],
-    [25, 0],
+    [ctaOverlayStart, ctaOverlayStart + 18],
+    [20, 0],
     { extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: Easing.out(Easing.cubic) },
   );
 
@@ -149,7 +164,7 @@ export const CinematicMessage: React.FC<CinematicProps> = ({
         />
       </AbsoluteFill>
 
-      {/* Dark gradient overlay — strong enough for crisp text readability on mobile */}
+      {/* Dark gradient overlay */}
       <AbsoluteFill
         style={{
           background: `linear-gradient(
@@ -181,7 +196,40 @@ export const CinematicMessage: React.FC<CinematicProps> = ({
         }}
       />
 
-      {/* Main content — fades out independently before CTA appears */}
+      {/* Hook text — visible on frame 0 for thumbnail, fades as reveal starts */}
+      {hookOpacity > 0 && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: isVertical ? '0 90px' : '0 60px',
+            opacity: hookOpacity,
+          }}
+        >
+          <div
+            style={{
+              fontFamily: 'Georgia, "Times New Roman", serif',
+              fontSize: isVertical ? 58 : 44,
+              lineHeight: 1.5,
+              color: '#f0e8e0',
+              textAlign: 'center',
+              fontWeight: 400,
+              fontStyle: 'italic',
+              textShadow: '0 2px 12px rgba(0, 0, 0, 0.8), 0 4px 30px rgba(0, 0, 0, 0.5)',
+            }}
+          >
+            {hookText}
+          </div>
+        </div>
+      )}
+
+      {/* Main content — fades out independently before CTA stays */}
       <div
         style={{
           display: 'flex',
@@ -258,7 +306,7 @@ export const CinematicMessage: React.FC<CinematicProps> = ({
               <span
                 key={i}
                 style={{
-                  opacity: wordProgress,
+                  opacity: frame >= contentDelay ? wordProgress : 0,
                   display: 'inline-block',
                   transform: `scale(${wordScale})`,
                   filter: `blur(${wordBlur}px)`,
@@ -302,36 +350,15 @@ export const CinematicMessage: React.FC<CinematicProps> = ({
         />
       </div>
 
-      {/* Branding — positioned above platform UI overlays */}
+      {/* CTA — overlays during "From" hold, then stays after message fades */}
       <div
         style={{
           position: 'absolute',
-          bottom: isVertical ? 420 : 50,
           left: 0,
           right: 0,
-          textAlign: 'center',
-          fontFamily: 'Poppins, sans-serif',
-          fontSize: isVertical ? 16 : 14,
-          color: 'rgba(200, 168, 130, 0.7)',
-          opacity: brandOpacity,
-          letterSpacing: '5px',
-          textTransform: 'uppercase',
-        }}
-      >
-        words left unsaid
-      </div>
-
-      {/* CTA — appears cleanly after message is gone */}
-      <div
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
+          bottom: isVertical ? 350 : 120,
           display: 'flex',
           flexDirection: 'column',
-          justifyContent: 'center',
           alignItems: 'center',
           opacity: ctaOpacity,
           transform: `translateY(${ctaSlide}px)`,
@@ -340,7 +367,7 @@ export const CinematicMessage: React.FC<CinematicProps> = ({
         <div
           style={{
             fontFamily: 'Poppins, sans-serif',
-            fontSize: isVertical ? 30 : 24,
+            fontSize: isVertical ? 26 : 20,
             fontWeight: 300,
             color: 'rgba(200, 168, 130, 0.9)',
             letterSpacing: '3px',
@@ -353,10 +380,10 @@ export const CinematicMessage: React.FC<CinematicProps> = ({
         <div
           style={{
             fontFamily: 'Georgia, "Times New Roman", serif',
-            fontSize: isVertical ? 42 : 34,
+            fontSize: isVertical ? 36 : 28,
             fontWeight: 400,
             color: '#f0e8e0',
-            marginTop: isVertical ? 20 : 14,
+            marginTop: isVertical ? 16 : 10,
             letterSpacing: '2px',
             textShadow: '0 2px 15px rgba(0, 0, 0, 0.6)',
           }}

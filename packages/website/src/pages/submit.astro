@@ -100,6 +100,13 @@ if (Astro.request.method === 'POST') {
             <a href="/submit" class="btn-ghost">Write another</a>
             <a href="/" class="btn-ghost">Browse messages</a>
           </div>
+          {messageId && (
+            <script is:inline define:vars={{ messageId }}>
+              if (typeof gtag !== 'undefined') {
+                gtag('event', 'message_submit', { message_id: messageId });
+              }
+            </script>
+          )}
         </div>
       ) : (
         <div class="form-container">

@@ -9,7 +9,7 @@ Style: empathetic, thoughtful, never clickbaity. Use the emotional weight of the
 
 export const CAPTION_USER_PROMPT = (
   message: { from: string; to: string; content: string },
-  platform: 'instagram' | 'tiktok',
+  platform: 'instagram' | 'tiktok' | 'youtube',
   strategyGuidelines?: string,
 ) => {
   let prompt = `Write a ${platform} caption for this message:

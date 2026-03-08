@@ -12,11 +12,14 @@ import { launchInstagram, navigateToHashtag } from '../platforms/instagram/brows
  * Intentionally very conservative to minimize ban risk.
  */
 const LIMITS = {
-  maxLikesPerDay: 10,
+  maxLikesPerDay: 15,
   maxFollowsPerDay: 5,
   maxCommentsPerDay: 3,
-  minDelayBetweenActions: 15000, // 15 seconds between actions
+  minDelayBetweenActions: 5000, // 5 seconds between actions (was 15s — too slow)
 } as const;
+
+/** Our own account usernames — skip these during outbound engagement */
+const OWN_ACCOUNTS = ['u.wordsleftunsaid', 'wordsleftunsaid'];
 
 /**
  * Thoughtful comment templates for different types of content.
@@ -116,9 +119,9 @@ export async function runOutboundSession(
 
     console.log(`[outbound] Found ${postCount} posts`);
 
-    // Engage with up to 5 unique posts per session
-    const maxToScan = Math.min(postCount, 10); // scan more to find 5 unique
-    const targetUnique = 5;
+    // Engage with up to 8 unique posts per session
+    const maxToScan = Math.min(postCount, 15); // scan more to find 8 unique
+    const targetUnique = 8;
     const likesToDo = Math.min(remaining.likes, targetUnique);
     const followsToDo = Math.min(remaining.follows, 2);
     const commentsToDo = Math.min(remaining.comments, 1);
@@ -141,7 +144,7 @@ export async function runOutboundSession(
 
         console.log(`[outbound] Opening post ${i + 1} (unique: ${uniqueVisited + 1}/${targetUnique})...`);
         await postLinks.nth(i).click({ timeout: 10000 });
-        await page.waitForTimeout(3000);
+        await page.waitForTimeout(1500);
 
         // Get post author
         const username = await getPostUsername(page);
@@ -155,6 +158,13 @@ export async function runOutboundSession(
           continue;
         }
 
+        // Skip our own account
+        if (OWN_ACCOUNTS.includes(username.toLowerCase())) {
+          console.log(`[outbound] Skipping own account @${username}`);
+          uniqueVisited--; // Don't count toward the unique target
+          continue;
+        }
+
         // --- Action 1: Like the post ---
         if (result.likes < likesToDo) {
           console.log(`[outbound] Liking post by @${username}...`);
@@ -162,6 +172,7 @@ export async function runOutboundSession(
           if (liked) {
             await recordOutboundEngagement({
               actionType: 'like',
+              platform: 'instagram',
               targetUsername: username,
               targetPostUrl: postUrl,
               targetHashtag: targetHashtag,
@@ -192,6 +203,7 @@ export async function runOutboundSession(
           if (followed) {
             await recordOutboundEngagement({
               actionType: 'follow',
+              platform: 'instagram',
               targetUsername: username,
               targetPostUrl: postUrl,
               targetHashtag: targetHashtag,
@@ -215,6 +227,7 @@ export async function runOutboundSession(
           if (commented) {
             await recordOutboundEngagement({
               actionType: 'comment',
+              platform: 'instagram',
               targetUsername: username,
               targetPostUrl: postUrl,
               targetHashtag: targetHashtag,
@@ -284,9 +297,9 @@ async function likePost(page: Page): Promise<boolean> {
     }
 
     const likeBtn = page.locator('svg[aria-label="Like"]').first();
-    if (await likeBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+    if (await likeBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
       await likeBtn.click();
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(500);
       return true;
     }
 
@@ -297,25 +310,59 @@ async function likePost(page: Page): Promise<boolean> {
 }
 
 /**
+ * Words/phrases that indicate a comment we should NOT like.
+ * Covers hostility, profanity, negativity, controversy, and spam.
+ */
+const COMMENT_BLOCKLIST = [
+  'bullshit', 'bullsh1t', 'bs', 'fuck', 'stfu', 'shit', 'ass',
+  'hate', 'hating', 'pathetic', 'disgusting', 'trash', 'garbage',
+  'fake', 'cringe', 'ratio', 'L take', 'worst', 'dumb', 'stupid',
+  'shut up', 'kill', 'die', 'kys',
+  'follow me', 'check my', 'check out my', 'dm me', 'link in bio',
+  'promo', 'collab?',
+];
+
+/**
+ * Check whether a comment's text is safe to like.
+ * Returns false for hostile, profane, negative, or spammy comments.
+ */
+function isCommentSafeToLike(text: string): boolean {
+  const lower = text.toLowerCase().trim();
+  if (lower.length < 2) return false;
+  return !COMMENT_BLOCKLIST.some((word) => lower.includes(word));
+}
+
+/**
  * Like comments on the currently open post.
- * Clicks the small heart icon next to individual comments.
+ * Reads each comment's text first and only likes positive/neutral ones.
  */
 async function likeCommentsOnPost(page: Page, maxLikes: number): Promise<number> {
   let liked = 0;
 
   try {
-    // Comment like buttons are small heart SVGs within comment list items
-    const commentLikeBtns = page.locator('ul li svg[aria-label="Like"]');
-    const count = Math.min(await commentLikeBtns.count(), maxLikes);
+    // Each comment is an <li> containing text and a like button
+    const commentItems = page.locator('ul li');
+    const itemCount = await commentItems.count();
 
-    for (let i = 0; i < count; i++) {
+    for (let i = 0; i < itemCount && liked < maxLikes; i++) {
       try {
-        const btn = commentLikeBtns.nth(i);
-        if (await btn.isVisible({ timeout: 1000 }).catch(() => false)) {
-          await btn.click();
-          liked++;
-          await page.waitForTimeout(800);
+        const item = commentItems.nth(i);
+        const likeBtn = item.locator('svg[aria-label="Like"]');
+
+        if (!(await likeBtn.isVisible({ timeout: 500 }).catch(() => false))) {
+          continue;
         }
+
+        // Read the comment text before deciding to like
+        const commentText = await item.textContent().catch(() => '') ?? '';
+        if (!isCommentSafeToLike(commentText)) {
+          console.log(`[outbound] Skipping comment (filtered): "${commentText.slice(0, 50)}..."`);
+          continue;
+        }
+
+        await likeBtn.click();
+        liked++;
+        await page.waitForTimeout(400);
       } catch {
         // Skip this comment
       }
@@ -336,9 +383,9 @@ async function followUser(page: Page): Promise<boolean> {
       .locator('header')
       .getByRole('button', { name: 'Follow' });
 
-    if (await followBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+    if (await followBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
       await followBtn.click();
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(1000);
       return true;
     }
 
@@ -374,11 +421,11 @@ async function leaveComment(page: Page, text: string): Promise<boolean> {
     }
 
     await input.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(300);
     // Use keyboard.type for more reliable input (fill doesn't always trigger Instagram's handlers)
     await input.fill('');
-    await page.keyboard.type(text, { delay: 30 });
-    await page.waitForTimeout(1000);
+    await page.keyboard.type(text, { delay: 15 });
+    await page.waitForTimeout(500);
 
     // Instagram uses div[role="button"] with text "Post", not a real <button>
     const postBtn = page.locator('[role="button"]').filter({ hasText: /^Post$/ }).first();
@@ -386,12 +433,12 @@ async function leaveComment(page: Page, text: string): Promise<boolean> {
       // Fallback: try pressing Enter
       console.log('[outbound] Post button not visible, pressing Enter...');
       await page.keyboard.press('Enter');
-      await page.waitForTimeout(3000);
+      await page.waitForTimeout(1500);
       return true;
     }
 
     await postBtn.click();
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(1500);
     return true;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

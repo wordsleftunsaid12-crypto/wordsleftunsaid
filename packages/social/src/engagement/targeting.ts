@@ -2,25 +2,34 @@ import { getLatestStrategyBrief } from '@wlu/shared';
 import type { StrategyBrief } from '@wlu/shared';
 
 /**
- * Hashtags related to the Words Left Unsaid brand and emotional content.
- * These are used for finding related content to engage with.
+ * Hashtags for outbound engagement, ordered by traffic level.
+ * High-traffic tags appear first for better discovery on TikTok.
+ * Niche tags are still included for community building on Instagram.
  */
 const DEFAULT_TARGET_HASHTAGS = [
-  'unsaidwords',
-  'lettersneverwritten',
+  // High-traffic — active on both TikTok and Instagram (weighted: appear twice)
+  'mentalhealthawareness',
+  'selflove',
+  'healing',
+  'heartbreak',
+  'deepquotes',
+  'relatablequotes',
+  'emotionalhealing',
+  'breakup',
+  // Duplicate high-traffic for higher selection probability
+  'mentalhealthawareness',
+  'heartbreak',
+  'deepquotes',
+  'relatablequotes',
+  // Medium-traffic — good engagement, less competition
   'dearex',
   'openletter',
-  'unsent',
   'unsentletters',
-  'mentalhealthawareness',
-  'dearfutureme',
   'thingsineversaid',
-  'wordsleftunsaid',
-  'emotionalhealth',
-  'vulnerabilityisstrength',
-  'unsaidthoughts',
+  'dearfutureme',
   'lettertoself',
   'healingthroughwords',
+  'letterstomyex',
 ];
 
 /**

@@ -164,7 +164,10 @@ async function uploadVideo(
     }
   }
 
-  // 7. Click Post/Publish
+  // 7. Dismiss any lingering modals (e.g. from cover editor)
+  await dismissUploadModals(page);
+
+  // 8. Click Post/Publish
   console.log('[tiktok-publish] Clicking Post...');
   await clickPublish(page);
 
@@ -255,20 +258,30 @@ async function clickPublish(page: Page): Promise<void> {
       console.log('[tiktok-publish] Post button disabled, waiting...');
       await page.waitForTimeout(5000);
     }
-    await postBtn.click({ timeout: 10000 });
+    try {
+      await postBtn.click({ timeout: 10000 });
+    } catch {
+      // Modal overlay might be intercepting — force click
+      console.log('[tiktok-publish] Click intercepted, force-clicking...');
+      await postBtn.click({ force: true, timeout: 10000 });
+    }
     return;
   }
 
   // Fallback: TUXButton primary class
   const altBtn = page.locator('.TUXButton--primary').first();
   if (await altBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await altBtn.click({ timeout: 10000 });
+    try {
+      await altBtn.click({ timeout: 10000 });
+    } catch {
+      await altBtn.click({ force: true, timeout: 10000 });
+    }
     return;
   }
 
   // Last resort: button with "Post" text
   const textBtn = page.getByRole('button', { name: /^Post$/i }).first();
-  await textBtn.click({ timeout: 10000 });
+  await textBtn.click({ force: true, timeout: 10000 });
 }
 
 /**

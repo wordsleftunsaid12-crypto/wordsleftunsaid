@@ -58,6 +58,7 @@ function mapComment(row: Row): CommentTracking {
 function mapOutbound(row: Row): OutboundEngagement {
   return {
     id: row.id as string,
+    platform: (row.platform as Platform) ?? 'instagram',
     actionType: row.action_type as OutboundEngagement['actionType'],
     targetUsername: row.target_username as string,
     targetPostUrl: row.target_post_url as string | null,
@@ -191,6 +192,63 @@ export async function getPostCountToday(platform: Platform): Promise<number> {
 
   if (error) throw new Error(`Failed to count today's posts: ${error.message}`);
   return count ?? 0;
+}
+
+/**
+ * Check if any of the given message IDs have already been posted on the target platform.
+ * Returns true if at least one overlapping post exists.
+ */
+export async function hasPostForMessages(
+  platform: Platform,
+  messageIds: string[],
+): Promise<boolean> {
+  if (messageIds.length === 0) return false;
+  const client = getServiceClient();
+
+  const { data, error } = await client
+    .from('posts')
+    .select('id, message_ids')
+    .eq('platform', platform)
+    .not('message_ids', 'eq', '{}');
+
+  if (error) throw new Error(`Failed to check existing posts: ${error.message}`);
+
+  const targetSet = new Set(messageIds);
+  for (const row of data ?? []) {
+    for (const id of (row.message_ids as string[]) ?? []) {
+      if (targetSet.has(id)) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Check if a content_queue item already exists for the given message IDs on the target platform
+ * in a non-terminal state (not 'posted' or 'failed').
+ */
+export async function hasQueueItemForMessages(
+  platform: Platform,
+  messageIds: string[],
+): Promise<boolean> {
+  if (messageIds.length === 0) return false;
+  const client = getServiceClient();
+
+  const { data, error } = await client
+    .from('content_queue')
+    .select('id, message_ids')
+    .eq('platform', platform)
+    .not('status', 'in', '("posted","failed")')
+    .not('message_ids', 'eq', '{}');
+
+  if (error) throw new Error(`Failed to check content queue: ${error.message}`);
+
+  const targetSet = new Set(messageIds);
+  for (const row of data ?? []) {
+    for (const id of (row.message_ids as string[]) ?? []) {
+      if (targetSet.has(id)) return true;
+    }
+  }
+  return false;
 }
 
 // --- Engagement Metrics ---
@@ -335,6 +393,7 @@ export async function markCommentReplied(
 
 export async function recordOutboundEngagement(input: {
   actionType: 'like' | 'follow' | 'comment';
+  platform?: Platform;
   targetUsername: string;
   targetPostUrl?: string;
   targetHashtag?: string;
@@ -346,6 +405,7 @@ export async function recordOutboundEngagement(input: {
     .from('outbound_engagement')
     .insert({
       action_type: input.actionType,
+      platform: input.platform ?? 'instagram',
       target_username: input.targetUsername,
       target_post_url: input.targetPostUrl ?? null,
       target_hashtag: input.targetHashtag ?? null,
@@ -360,6 +420,7 @@ export async function recordOutboundEngagement(input: {
 
 export async function getOutboundEngagementCountToday(
   actionType?: 'like' | 'follow' | 'comment',
+  platform?: Platform,
 ): Promise<number> {
   const client = getServiceClient();
   const today = new Date();
@@ -371,10 +432,34 @@ export async function getOutboundEngagementCountToday(
     .gte('created_at', today.toISOString());
 
   if (actionType) query = query.eq('action_type', actionType);
+  if (platform) query = query.eq('platform', platform);
 
   const { count, error } = await query;
   if (error) throw new Error(`Failed to count outbound engagement: ${error.message}`);
   return count ?? 0;
+}
+
+/**
+ * Get usernames that were followed recently (within the cooldown period).
+ * Used to avoid unfollowing people we just followed — that looks spammy.
+ */
+export async function getRecentlyFollowedUsernames(
+  platform: Platform = 'instagram',
+  cooldownDays = 7,
+): Promise<string[]> {
+  const client = getServiceClient();
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - cooldownDays);
+
+  const { data, error } = await client
+    .from('outbound_engagement')
+    .select('target_username')
+    .eq('action_type', 'follow')
+    .eq('platform', platform)
+    .gte('created_at', cutoff.toISOString());
+
+  if (error) throw new Error(`Failed to get recently followed: ${error.message}`);
+  return (data ?? []).map((row: { target_username: string }) => row.target_username);
 }
 
 // --- Strategy Briefs ---

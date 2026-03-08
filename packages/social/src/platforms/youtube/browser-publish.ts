@@ -214,10 +214,8 @@ async function waitForHdProcessing(page: Page): Promise<void> {
     }
 
     const elapsed = Math.round((Date.now() - startTime) / 1000);
-    if (elapsed % 15 === 0 && elapsed > 0) {
-      const text = await processingText.textContent().catch(() => 'still processing');
-      console.log(`[youtube-publish] ${text} (${elapsed}s waited)`);
-    }
+    const text = await processingText.textContent().catch(() => 'still processing');
+    console.log(`[youtube-publish] HD: ${text} (${elapsed}s)`)
 
     await page.waitForTimeout(pollInterval);
   }
@@ -252,9 +250,7 @@ async function waitForProcessing(page: Page): Promise<void> {
     }
 
     const elapsed = Math.round((Date.now() - startTime) / 1000);
-    if (elapsed % 20 === 0 && elapsed > 0) {
-      console.log(`[youtube-publish] Processing... (${elapsed}s)`);
-    }
+    console.log(`[youtube-publish] Waiting for upload dialog... (${elapsed}s)`);
     await page.waitForTimeout(pollInterval);
   }
 

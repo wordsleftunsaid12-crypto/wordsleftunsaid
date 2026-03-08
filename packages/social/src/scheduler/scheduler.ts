@@ -4,10 +4,12 @@ import { captionPendingItems } from '../captions/generate.js';
 import { ingestNewVideos } from '../ingest.js';
 import { publishNextScheduled } from './publish-job.js';
 import { runCommentResponder } from '../engagement/comment-responder.js';
+import { collectAllFollowerSnapshots } from '../collectors/followers.js';
+import { seedDailyMessages } from '../content/message-seeder.js';
 
 interface SchedulerOptions {
   dryRun?: boolean;
-  platform?: 'instagram' | 'tiktok';
+  platform?: 'instagram' | 'tiktok' | 'youtube';
 }
 
 /**
@@ -50,6 +52,16 @@ export async function startScheduler(options: SchedulerOptions = {}): Promise<vo
       name: 'comment-reply',
       baseInterval: INTERVALS.COMMENT_REPLY,
       fn: () => runCommentResponder({ dryRun }),
+    },
+    {
+      name: 'follower-snapshot',
+      baseInterval: INTERVALS.METRICS,
+      fn: () => collectAllFollowerSnapshots(),
+    },
+    {
+      name: 'seed-messages',
+      baseInterval: INTERVALS.LEARN,
+      fn: () => seedDailyMessages({ dryRun }),
     },
   ];
 

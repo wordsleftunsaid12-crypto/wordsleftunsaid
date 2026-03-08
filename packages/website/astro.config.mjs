@@ -10,7 +10,7 @@ import netlify from '@astrojs/netlify';
 import sitemap from '@astrojs/sitemap';
 
 export default defineConfig({
-  site: 'https://wordsleftunsaid.netlify.app',
+  site: 'https://wordsleftunsent.com',
   output: 'server',
   adapter: netlify(),
   integrations: [sitemap()],

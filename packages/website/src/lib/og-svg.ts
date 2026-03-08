@@ -100,7 +100,7 @@ export function buildOgSvg(to: string, from: string, content: string): string {
   <text x="100" y="${HEIGHT - 25}" font-family="system-ui, -apple-system, sans-serif" font-size="14" fill="${TEXT_MUTED}" letter-spacing="2">WORDS LEFT UNSAID</text>
 
   <!-- URL -->
-  <text x="${WIDTH - 100}" y="${HEIGHT - 25}" font-family="system-ui, -apple-system, sans-serif" font-size="12" fill="${TEXT_MUTED}" text-anchor="end" opacity="0.6">wordsleftunsaid.netlify.app</text>
+  <text x="${WIDTH - 100}" y="${HEIGHT - 25}" font-family="system-ui, -apple-system, sans-serif" font-size="12" fill="${TEXT_MUTED}" text-anchor="end" opacity="0.6">wordsleftunsent.com</text>
 </svg>`;
 }
 

@@ -47,8 +47,8 @@ export async function browserPublishPinterest(options: {
   // Build link to message page
   const messageId = options.messageIds?.[0];
   const pinUrl = messageId
-    ? `https://wordsleftunsaid.netlify.app/messages/${messageId}`
-    : 'https://wordsleftunsaid.netlify.app';
+    ? `https://wordsleftunsent.com/messages/${messageId}`
+    : 'https://wordsleftunsent.com';
 
   if (options.dryRun) {
     console.log('[pinterest-publish] [DRY RUN] Would create pin:');

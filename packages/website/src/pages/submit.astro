@@ -73,7 +73,7 @@ if (Astro.request.method === 'POST') {
                 messageId: message.id,
                 email: sanitized.email,
                 to: sanitized.to,
-                siteUrl: import.meta.env.SITE || 'https://wordsleftunsaid.netlify.app',
+                siteUrl: import.meta.env.SITE || 'https://wordsleftunsent.com',
               }).catch(() => {});
             }
           }

@@ -19,7 +19,7 @@ interface CaptionTemplate {
   moods: MessageMood[];
 }
 
-const CTA_LINK = 'wordsleftunsaid.netlify.app';
+const CTA_LINK = 'wordsleftunsent.com';
 
 const TEMPLATES: CaptionTemplate[] = [
   {

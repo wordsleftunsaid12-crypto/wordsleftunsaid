@@ -9,7 +9,7 @@ const posts = [
 
 Sometimes the most meaningful thing you can do is simply show up — no performance, no pretending.
 
-Share yours at wordsleftunsaid.netlify.app
+Share yours at wordsleftunsent.com
 
 #wordsleftunsaid #unsentletters #thingsineversaid #unsaidwords #deepquotes #feelings #relatable #poetrycommunity #vulnerability #fyp #foryou`,
     mood: 'tender' as const,
@@ -21,7 +21,7 @@ Share yours at wordsleftunsaid.netlify.app
 
 The words we never share are often the ones that matter most. This is your space to finally let them out.
 
-Share yours at wordsleftunsaid.netlify.app
+Share yours at wordsleftunsent.com
 
 #wordsleftunsaid #unsentletters #thingsineversaid #unsaidwords #anonymousmessages #heartfelt #feelings #relatable #fyp #foryou`,
     mood: 'raw' as const,

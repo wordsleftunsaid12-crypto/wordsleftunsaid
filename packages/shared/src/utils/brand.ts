@@ -18,7 +18,7 @@ export const BRAND = {
     bodyRegular: 400,
     bodyMedium: 500,
   },
-  domain: 'wordsleftunsaid.netlify.app',
+  domain: 'wordsleftunsent.com',
   name: 'Words Left Unsaid',
   tagline: 'The messages we never sent.',
 } as const;

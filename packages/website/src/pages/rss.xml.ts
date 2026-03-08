@@ -11,7 +11,7 @@ function escapeXml(text: string): string {
 }
 
 export const GET: APIRoute = async ({ site }) => {
-  const siteUrl = site?.toString() ?? 'https://wordsleftunsaid.netlify.app';
+  const siteUrl = site?.toString() ?? 'https://wordsleftunsent.com';
   const messages = await getApprovedMessages({ limit: 50 });
 
   const items = messages

@@ -380,7 +380,7 @@ export const CinematicMessage: React.FC<CinematicProps> = ({
             textShadow: '0 2px 20px rgba(0, 0, 0, 0.8)',
           }}
         >
-          wordsleftunsaid.netlify.app
+          wordsleftunsent.com
         </div>
       </div>
     </AbsoluteFill>

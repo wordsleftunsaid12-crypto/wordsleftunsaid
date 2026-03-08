@@ -33,8 +33,8 @@ export async function browserPublishThreads(options: {
   // Build thread text — short quote + link
   const messageId = options.messageIds?.[0];
   const link = messageId
-    ? `https://wordsleftunsaid.netlify.app/messages/${messageId}`
-    : 'https://wordsleftunsaid.netlify.app';
+    ? `https://wordsleftunsent.com/messages/${messageId}`
+    : 'https://wordsleftunsent.com';
 
   const firstLine = options.caption.split('\n')[0].slice(0, 400);
   const threadText = `${firstLine}\n\n${link}`;

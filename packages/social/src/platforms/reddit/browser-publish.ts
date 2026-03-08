@@ -52,7 +52,7 @@ export async function browserPublishReddit(options: {
     : 'Words left unsaid';
 
   const body = options.messageContent ?? options.caption;
-  const footer = '\n\n---\n*Read more anonymous messages at [wordsleftunsaid.netlify.app](https://wordsleftunsaid.netlify.app)*';
+  const footer = '\n\n---\n*Read more anonymous messages at [wordsleftunsent.com](https://wordsleftunsent.com)*';
 
   if (options.dryRun) {
     console.log('[reddit-publish] [DRY RUN] Would post to r/' + subreddit);

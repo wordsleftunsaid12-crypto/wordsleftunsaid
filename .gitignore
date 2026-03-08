@@ -4,6 +4,8 @@ dist/
 output/
 *.mp4
 *.mov
+*.mp3
+packages/content-engine/assets/
 .env
 .env.local
 .env.*.local

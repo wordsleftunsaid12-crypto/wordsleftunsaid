@@ -4,6 +4,7 @@ import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import {
   createApprovedMessage,
+  findRecentDuplicate,
   sanitizeMessageInput,
   moderateContent,
   notifyMessageApproved,
@@ -59,6 +60,8 @@ if (Astro.request.method === 'POST') {
             formError = isQuality
               ? 'This space is for words that matter. Take a moment and write something real.'
               : 'This message can\u2019t be posted. Please keep it respectful.';
+          } else if (await findRecentDuplicate(sanitized)) {
+            formError = 'This message was already submitted. Thank you!';
           } else {
             const message = await createApprovedMessage(sanitized);
             submitted = true;
@@ -335,7 +338,12 @@ if (Astro.request.method === 'POST') {
     if (counter) counter.textContent = String(textarea.value.length);
   });
 
-  form?.addEventListener('submit', () => {
+  form?.addEventListener('submit', (e) => {
+    if (form.dataset.submitting === 'true') {
+      e.preventDefault();
+      return;
+    }
+    form.dataset.submitting = 'true';
     if (submitBtn) {
       submitBtn.disabled = true;
       submitBtn.textContent = 'Sending...';

@@ -36,6 +36,7 @@ export {
   getMessageById,
   createMessage,
   createApprovedMessage,
+  findRecentDuplicate,
   approveMessage,
   getUnapprovedMessages,
   searchMessages,

@@ -102,6 +102,23 @@ export async function searchMessages(
   return data as Message[];
 }
 
+export async function findRecentDuplicate(input: CreateMessageInput, windowMinutes = 5): Promise<boolean> {
+  const client = getServiceClient();
+  const since = new Date(Date.now() - windowMinutes * 60 * 1000).toISOString();
+
+  const { data, error } = await client
+    .from('messages')
+    .select('id')
+    .eq('from', input.from)
+    .eq('to', input.to)
+    .eq('content', input.content)
+    .gte('created_at', since)
+    .limit(1);
+
+  if (error) throw new Error(`Failed to check for duplicate: ${error.message}`);
+  return (data?.length ?? 0) > 0;
+}
+
 export async function createApprovedMessage(input: CreateMessageInput): Promise<Message> {
   const client = getServiceClient();
 

@@ -4,7 +4,7 @@ import {
   getScheduleConfig,
   getLatestStrategyBrief,
 } from '@wlu/shared';
-import type { ContentQueueItem, StrategyBrief } from '@wlu/shared';
+import type { ContentQueueItem, StrategyBrief, Platform } from '@wlu/shared';
 
 /**
  * Assign scheduled posting times to captioned items in the content queue.
@@ -12,7 +12,7 @@ import type { ContentQueueItem, StrategyBrief } from '@wlu/shared';
  * Returns the number of items scheduled.
  */
 export async function scheduleCaptionedItems(
-  options: { platform?: 'instagram' | 'tiktok' | 'youtube'; dryRun?: boolean } = {},
+  options: { platform?: Platform; dryRun?: boolean } = {},
 ): Promise<number> {
   const { platform = 'instagram', dryRun = false } = options;
 
@@ -100,7 +100,7 @@ function computeNextSlots(preferredHours: number[], count: number): Date[] {
  * Falls back to sensible defaults if no data is available.
  */
 async function getPreferredPostingHours(
-  platform: 'instagram' | 'tiktok' | 'youtube',
+  platform: Platform,
 ): Promise<number[]> {
   // Default posting hours (peak engagement: noon, 6pm, 8pm — Mon-Thu evenings strongest)
   const defaults = [12, 18, 20];
@@ -134,7 +134,7 @@ async function getPreferredPostingHours(
  * Get a summary of the current queue state.
  */
 export async function getQueueStatus(
-  platform?: 'instagram' | 'tiktok' | 'youtube',
+  platform?: Platform,
 ): Promise<{
   pending: number;
   qa_passed: number;

@@ -1,10 +1,10 @@
 import 'dotenv/config';
+import type { Platform } from '@wlu/shared';
 
 const command = process.argv[2];
 const flags = process.argv.slice(3);
 const dryRun = flags.includes('--dry-run');
-const platform = (flags.find((f) => f.startsWith('--platform='))?.split('=')[1] ?? 'instagram') as
-  'instagram' | 'tiktok' | 'youtube';
+const platform = (flags.find((f) => f.startsWith('--platform='))?.split('=')[1] ?? 'instagram') as Platform;
 
 async function main(): Promise<void> {
   switch (command) {
@@ -45,6 +45,15 @@ async function main(): Promise<void> {
       } else if (platform === 'youtube') {
         const { runYouTubeOutboundSession } = await import('./engagement/outbound-youtube.js');
         await runYouTubeOutboundSession({ dryRun });
+      } else if (platform === 'reddit') {
+        const { runRedditOutboundSession } = await import('./engagement/outbound-reddit.js');
+        await runRedditOutboundSession({ dryRun });
+      } else if (platform === 'twitter') {
+        const { runTwitterOutboundSession } = await import('./engagement/outbound-twitter.js');
+        await runTwitterOutboundSession({ dryRun });
+      } else if (platform === 'threads') {
+        const { runThreadsOutboundSession } = await import('./engagement/outbound-threads.js');
+        await runThreadsOutboundSession({ dryRun });
       } else {
         const { runOutboundSession } = await import('./engagement/outbound.js');
         await runOutboundSession({ dryRun });
@@ -100,7 +109,7 @@ async function main(): Promise<void> {
       console.log('  status         Show content queue status');
       console.log('\nFlags:');
       console.log('  --dry-run            Log actions without executing');
-      console.log('  --platform=instagram  Target platform (instagram|tiktok|youtube)');
+      console.log('  --platform=instagram  Target platform (instagram|tiktok|youtube|reddit|twitter|threads|pinterest)');
       console.log('  --count=2            Number of messages to seed (seed-messages)');
   }
 }

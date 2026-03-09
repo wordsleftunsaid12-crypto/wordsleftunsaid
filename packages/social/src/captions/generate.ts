@@ -5,7 +5,7 @@ import {
   getLatestStrategyBrief,
   getMessageById,
 } from '@wlu/shared';
-import type { StrategyBrief } from '@wlu/shared';
+import type { StrategyBrief, Platform } from '@wlu/shared';
 import { CAPTION_SYSTEM_PROMPT, CAPTION_USER_PROMPT } from './prompts.js';
 
 interface CaptionResult {
@@ -22,7 +22,7 @@ function getClient(): Anthropic {
  */
 export async function generateCaption(
   message: { from: string; to: string; content: string },
-  platform: 'instagram' | 'tiktok' | 'youtube' = 'instagram',
+  platform: Platform = 'instagram',
 ): Promise<CaptionResult> {
   const client = getClient();
 
@@ -78,7 +78,7 @@ export async function generateCaption(
  * Returns the number of items captioned.
  */
 export async function captionPendingItems(
-  options: { platform?: 'instagram' | 'tiktok' | 'youtube'; dryRun?: boolean } = {},
+  options: { platform?: Platform; dryRun?: boolean } = {},
 ): Promise<number> {
   const { platform = 'instagram', dryRun = false } = options;
 

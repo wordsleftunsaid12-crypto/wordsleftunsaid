@@ -9,14 +9,13 @@ import { browserPublishReel } from '../platforms/instagram/browser-publish.js';
 
 /** Platforms to auto-cross-post to after a successful publish. */
 const CROSS_POST_TARGETS: Record<string, string[]> = {
-  instagram: ['tiktok', 'youtube'],
-  tiktok: ['instagram', 'youtube'],
-  youtube: ['instagram', 'tiktok'],
-  // Text platforms don't auto-cross-post to video platforms (different content format)
+  instagram: ['tiktok', 'youtube', 'reddit', 'pinterest', 'twitter', 'threads'],
+  tiktok: [],
+  youtube: [],
   reddit: [],
   pinterest: [],
-  twitter: ['threads'],
-  threads: ['twitter'],
+  twitter: [],
+  threads: [],
 };
 
 /** CTA domain kept clean — no UTM params in captions (users type URLs manually). */

@@ -4,7 +4,8 @@ import type { Platform } from '@wlu/shared';
 const command = process.argv[2];
 const flags = process.argv.slice(3);
 const dryRun = flags.includes('--dry-run');
-const platform = (flags.find((f) => f.startsWith('--platform='))?.split('=')[1] ?? 'instagram') as Platform;
+const platformFlag = flags.find((f) => f.startsWith('--platform='))?.split('=')[1] as Platform | undefined;
+const platform: Platform = platformFlag ?? 'instagram';
 
 async function main(): Promise<void> {
   switch (command) {
@@ -16,7 +17,8 @@ async function main(): Promise<void> {
 
     case 'schedule': {
       const { startScheduler } = await import('./scheduler/scheduler.js');
-      await startScheduler({ platform, dryRun });
+      // When no --platform flag given, run across all platforms
+      await startScheduler({ platform: platformFlag, dryRun });
       break;
     }
 

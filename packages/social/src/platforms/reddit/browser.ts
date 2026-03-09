@@ -39,9 +39,9 @@ export async function launchReddit(): Promise<BrowserSession> {
   });
   await page.waitForTimeout(5000);
 
-  // Verify logged in by checking for user menu
+  // Verify logged in by checking for user menu or Create button (logged-in indicator)
   const isLoggedIn = await page
-    .locator('[id*="USER_DROPDOWN"], button[aria-label*="profile"], [data-testid="avatar"]')
+    .locator('[id*="USER_DROPDOWN"], button[aria-label*="profile"], [data-testid="avatar"], a[href*="/submit"], button:has-text("Create")')
     .first()
     .isVisible({ timeout: 5000 })
     .catch(() => false);

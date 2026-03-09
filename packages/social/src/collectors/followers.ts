@@ -1,6 +1,6 @@
 /**
- * Follower count scrapers for all 3 platforms.
- * Each platform needs its own browser context (can't run in parallel).
+ * Follower count scrapers for all platforms.
+ * Each platform needs its own browser context (runs sequentially).
  */
 import type { Page } from 'playwright';
 import { saveFollowerSnapshot } from '@wlu/shared';
@@ -8,6 +8,10 @@ import type { Platform } from '@wlu/shared';
 import { launchInstagram, navigateToProfile as navigateToIgProfile } from '../platforms/instagram/browser.js';
 import { launchTikTok, navigateToProfile as navigateToTkProfile } from '../platforms/tiktok/browser.js';
 import { launchYouTube } from '../platforms/youtube/browser.js';
+import { launchTwitter } from '../platforms/twitter/browser.js';
+import { launchReddit } from '../platforms/reddit/browser.js';
+import { launchThreads } from '../platforms/threads/browser.js';
+import { launchPinterest } from '../platforms/pinterest/browser.js';
 
 interface FollowerCounts {
   followers: number;
@@ -36,7 +40,6 @@ export async function scrapeInstagramFollowerCounts(
   try {
     await navigateToIgProfile(page, username);
     await page.waitForTimeout(2000);
-    await page.screenshot({ path: '/tmp/followers-instagram-debug.png' }).catch(() => {});
     return await extractInstagramCounts(page);
   } finally {
     await context.close();
@@ -102,7 +105,6 @@ export async function scrapeTikTokFollowerCounts(
   try {
     await navigateToTkProfile(page, username);
     await page.waitForTimeout(2000);
-    await page.screenshot({ path: '/tmp/followers-tiktok-debug.png' }).catch(() => {});
     return await extractTikTokCounts(page);
   } finally {
     await context.close();
@@ -110,7 +112,6 @@ export async function scrapeTikTokFollowerCounts(
 }
 
 async function extractTikTokCounts(page: Page): Promise<FollowerCounts> {
-  // TikTok profile uses data-e2e attributes for counts
   let followers = 0;
   let following = 0;
 
@@ -137,13 +138,10 @@ export async function scrapeYouTubeSubscriberCount(
 ): Promise<FollowerCounts> {
   const { context, page } = await launchYouTube();
   try {
-    // Navigate to the public channel page instead of Studio dashboard
-    // Studio metrics show views/engagement which get misread as subscribers
     const channelUrl = `https://www.youtube.com/${channelHandle}`;
     console.log(`[followers] Navigating to ${channelUrl}`);
     await page.goto(channelUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await page.waitForTimeout(3000);
-    await page.screenshot({ path: '/tmp/followers-youtube-debug.png' }).catch(() => {});
     return await extractYouTubeCounts(page);
   } finally {
     await context.close();
@@ -153,8 +151,7 @@ export async function scrapeYouTubeSubscriberCount(
 async function extractYouTubeCounts(page: Page): Promise<FollowerCounts> {
   let followers = 0;
 
-  // Strategy 1: Find the metadata span containing "subscribers" text
-  // YouTube renders subscriber count in a span.yt-content-metadata-view-model__metadata-text
+  // Strategy 1: metadata span with "subscribers" text
   const subText = await page.evaluate(() => {
     const spans = document.querySelectorAll(
       'span.yt-content-metadata-view-model__metadata-text, #subscriber-count, yt-formatted-string#subscriber-count',
@@ -198,6 +195,155 @@ async function extractYouTubeCounts(page: Page): Promise<FollowerCounts> {
   return { followers, following: 0 };
 }
 
+// --- Twitter/X ---
+
+export async function scrapeTwitterFollowerCounts(
+  username = 'unsentwords12',
+): Promise<FollowerCounts> {
+  const { context, page } = await launchTwitter();
+  try {
+    await page.goto(`https://x.com/${username}`, {
+      waitUntil: 'domcontentloaded',
+      timeout: 30000,
+    });
+    await page.waitForTimeout(3000);
+    return await extractTwitterCounts(page);
+  } finally {
+    await context.close();
+  }
+}
+
+async function extractTwitterCounts(page: Page): Promise<FollowerCounts> {
+  let followers = 0;
+  let following = 0;
+
+  // X profile shows "N Followers" and "N Following" as links
+  const followerLink = page.locator('a[href$="/verified_followers"]').first();
+  if (await followerLink.isVisible({ timeout: 5000 }).catch(() => false)) {
+    const text = await followerLink.innerText().catch(() => '');
+    const match = text.match(/([\d,.]+[KMB]?)/i);
+    if (match) followers = parseAbbreviatedCount(match[1]);
+  }
+
+  const followingLink = page.locator('a[href$="/following"]').first();
+  if (await followingLink.isVisible({ timeout: 3000 }).catch(() => false)) {
+    const text = await followingLink.innerText().catch(() => '');
+    const match = text.match(/([\d,.]+[KMB]?)/i);
+    if (match) following = parseAbbreviatedCount(match[1]);
+  }
+
+  // Fallback: parse from page body text
+  if (followers === 0) {
+    const bodyText = await page.locator('main').first().innerText().catch(() => '');
+    const fMatch = bodyText.match(/([\d,.]+[KMB]?)\s*Followers/);
+    const gMatch = bodyText.match(/([\d,.]+[KMB]?)\s*Following/);
+    if (fMatch) followers = parseAbbreviatedCount(fMatch[1]);
+    if (gMatch) following = parseAbbreviatedCount(gMatch[1]);
+  }
+
+  console.log(`[followers] Twitter: ${followers} followers, ${following} following`);
+  return { followers, following };
+}
+
+// --- Reddit ---
+
+export async function scrapeRedditFollowerCounts(
+  username = 'Proud-Minute4849',
+): Promise<FollowerCounts> {
+  const { context, page } = await launchReddit();
+  try {
+    await page.goto(`https://www.reddit.com/user/${username}/`, {
+      waitUntil: 'domcontentloaded',
+      timeout: 30000,
+    });
+    await page.waitForTimeout(3000);
+    return await extractRedditCounts(page);
+  } finally {
+    await context.close();
+  }
+}
+
+async function extractRedditCounts(page: Page): Promise<FollowerCounts> {
+  let followers = 0;
+
+  // Reddit profile shows karma and sometimes followers in the sidebar
+  const bodyText = await page.locator('main, [id*="profile"], aside').allInnerTexts()
+    .then(texts => texts.join(' '))
+    .catch(() => '');
+  const fMatch = bodyText.match(/([\d,.]+[KMB]?)\s*followers?/i);
+  if (fMatch) followers = parseAbbreviatedCount(fMatch[1]);
+
+  console.log(`[followers] Reddit: ${followers} followers`);
+  return { followers, following: 0 };
+}
+
+// --- Threads ---
+
+export async function scrapeThreadsFollowerCounts(
+  username = 'u.wordsleftunsaid',
+): Promise<FollowerCounts> {
+  const { context, page } = await launchThreads();
+  try {
+    await page.goto(`https://www.threads.net/@${username}`, {
+      waitUntil: 'domcontentloaded',
+      timeout: 30000,
+    });
+    await page.waitForTimeout(3000);
+    return await extractThreadsCounts(page);
+  } finally {
+    await context.close();
+  }
+}
+
+async function extractThreadsCounts(page: Page): Promise<FollowerCounts> {
+  let followers = 0;
+
+  // Threads profile shows "N followers" as a link/text
+  const bodyText = await page.locator('main, header').allInnerTexts()
+    .then(texts => texts.join(' '))
+    .catch(() => '');
+  const fMatch = bodyText.match(/([\d,.]+[KMB]?)\s*followers?/i);
+  if (fMatch) followers = parseAbbreviatedCount(fMatch[1]);
+
+  console.log(`[followers] Threads: ${followers} followers`);
+  return { followers, following: 0 };
+}
+
+// --- Pinterest ---
+
+export async function scrapePinterestFollowerCounts(
+  username = 'wordsleftunsent',
+): Promise<FollowerCounts> {
+  const { context, page } = await launchPinterest();
+  try {
+    await page.goto(`https://www.pinterest.com/${username}/`, {
+      waitUntil: 'domcontentloaded',
+      timeout: 30000,
+    });
+    await page.waitForTimeout(3000);
+    return await extractPinterestCounts(page);
+  } finally {
+    await context.close();
+  }
+}
+
+async function extractPinterestCounts(page: Page): Promise<FollowerCounts> {
+  let followers = 0;
+  let following = 0;
+
+  // Pinterest profile shows "N followers" and "N following"
+  const bodyText = await page.locator('main, header, [data-test-id="profile-header"]').allInnerTexts()
+    .then(texts => texts.join(' '))
+    .catch(() => '');
+  const fMatch = bodyText.match(/([\d,.]+[KMB]?)\s*followers?/i);
+  const gMatch = bodyText.match(/([\d,.]+[KMB]?)\s*following/i);
+  if (fMatch) followers = parseAbbreviatedCount(fMatch[1]);
+  if (gMatch) following = parseAbbreviatedCount(gMatch[1]);
+
+  console.log(`[followers] Pinterest: ${followers} followers, ${following} following`);
+  return { followers, following };
+}
+
 // --- Multi-platform collection ---
 
 interface CollectionResult {
@@ -206,7 +352,7 @@ interface CollectionResult {
 }
 
 /**
- * Collect follower snapshots from all 3 platforms sequentially.
+ * Collect follower snapshots from all platforms sequentially.
  * Each platform runs in its own browser context.
  * Errors on one platform don't block the others.
  */
@@ -217,6 +363,10 @@ export async function collectAllFollowerSnapshots(): Promise<CollectionResult> {
     { platform: 'instagram', fn: scrapeInstagramFollowerCounts },
     { platform: 'tiktok', fn: scrapeTikTokFollowerCounts },
     { platform: 'youtube', fn: scrapeYouTubeSubscriberCount },
+    { platform: 'twitter', fn: scrapeTwitterFollowerCounts },
+    { platform: 'reddit', fn: scrapeRedditFollowerCounts },
+    { platform: 'threads', fn: scrapeThreadsFollowerCounts },
+    { platform: 'pinterest', fn: scrapePinterestFollowerCounts },
   ];
 
   for (const { platform, fn } of scrapers) {

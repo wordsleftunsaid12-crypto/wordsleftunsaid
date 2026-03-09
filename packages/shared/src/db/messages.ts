@@ -1,5 +1,6 @@
 import { getAnonClient, getServiceClient } from './client.js';
 import type { Message, CreateMessageInput, MessageFilters } from '../types/message.js';
+import { moderateContent } from '../utils/moderate.js';
 
 const DEFAULT_PAGE_SIZE = 20;
 
@@ -39,10 +40,31 @@ export async function getMessageById(id: string): Promise<Message | null> {
 }
 
 export async function createMessage(input: CreateMessageInput): Promise<Message> {
-  const client = getAnonClient();
+  // Auto-moderate: approve clean submissions, reject flagged ones
+  const moderation = moderateContent(input.content, input.from, input.to);
+  const autoApproved = moderation.passed;
 
-  // Note: we don't chain .select().single() because the RLS SELECT policy
-  // only allows reading approved messages, and new messages start unapproved.
+  if (autoApproved) {
+    // Use service client so we can read back the inserted row (bypasses RLS)
+    const client = getServiceClient();
+    const { data, error } = await client
+      .from('messages')
+      .insert({
+        from: input.from,
+        to: input.to,
+        content: input.content,
+        email: input.email || null,
+        approved: true,
+      })
+      .select()
+      .single();
+
+    if (error) throw new Error(`Failed to create message: ${error.message}`);
+    return data as Message;
+  }
+
+  // Flagged content: insert as unapproved via anon client
+  const client = getAnonClient();
   const { error } = await client
     .from('messages')
     .insert({
@@ -55,7 +77,6 @@ export async function createMessage(input: CreateMessageInput): Promise<Message>
 
   if (error) throw new Error(`Failed to create message: ${error.message}`);
 
-  // Return a synthetic Message since we can't read it back through RLS
   return {
     id: crypto.randomUUID(),
     from: input.from,

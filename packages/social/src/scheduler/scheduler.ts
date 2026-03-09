@@ -139,9 +139,35 @@ export async function startScheduler(options: SchedulerOptions = {}): Promise<vo
       fn: () => runOutboundEngagement({ dryRun }),
     },
     {
-      name: 'seed-messages',
+      name: 'render-content',
+      baseInterval: INTERVALS.RENDER,
+      fn: async () => {
+        const { renderNextContent } = await import('../content/auto-render.js');
+        await renderNextContent({ dryRun });
+      },
+    },
+    {
+      name: 'learn',
       baseInterval: INTERVALS.LEARN,
-      fn: () => seedDailyMessages({ dryRun }),
+      fn: async () => {
+        await seedDailyMessages({ dryRun });
+        if (!dryRun) {
+          try {
+            const { execFile } = await import('node:child_process');
+            const { promisify } = await import('node:util');
+            const exec = promisify(execFile);
+            await exec('npx', ['tsx', 'packages/analytics/src/index.ts', 'strategy'], {
+              cwd: process.cwd(),
+              env: { ...process.env, PATH: `/opt/homebrew/bin:${process.env.PATH}` },
+              timeout: 5 * 60 * 1000,
+            });
+            console.log('[scheduler] Strategy brief generated');
+          } catch (err) {
+            // Strategy brief is optional — requires ANTHROPIC_API_KEY
+            console.warn('[scheduler] Strategy brief skipped:', err instanceof Error ? err.message : err);
+          }
+        }
+      },
     },
   ];
 

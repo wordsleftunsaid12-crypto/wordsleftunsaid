@@ -29,6 +29,7 @@ export const INTERVALS = {
   PUBLISH: 5 * 60000,        // 5 min base → 3.5-6.5 min
   COMMENT_REPLY: 30 * 60000, // 30 min base → 21-39 min
   OUTBOUND: 45 * 60000,      // 45 min base → 31-59 min
+  RENDER: 4 * 3600000,       // 4 hours base → 2.8-5.2 hours with jitter
   METRICS: 2 * 3600000,      // 2 hours base → 84-156 min
   LEARN: 24 * 3600000,       // 24 hours (once daily)
 } as const;

@@ -24,34 +24,53 @@ const recentlyUsedClips: string[] = [];
 const recentlyUsedTracks: string[] = [];
 
 /**
- * Select a random background video clip.
- * Pools ALL clips across all mood directories for maximum variety,
- * and avoids repeats within a batch (via recentlyUsedClips).
+ * Collect all clips from a specific mood directory.
  */
-export function selectBackgroundVideo(_mood: MessageMood): string {
-  // Collect every clip across all mood directories
+function getClipsForMood(mood: MessageMood): string[] {
+  const moodDir = path.join(ASSETS_DIR, mood);
+  if (!fs.existsSync(moodDir)) return [];
+  return fs
+    .readdirSync(moodDir)
+    .filter((f) => f.endsWith('.mp4'))
+    .map((f) => path.join(moodDir, f));
+}
+
+/**
+ * Collect all clips across all mood directories.
+ */
+function getAllClips(): string[] {
   const allClips: string[] = [];
   const dirs = fs.readdirSync(ASSETS_DIR).filter((d) => {
     const full = path.join(ASSETS_DIR, d);
     return fs.statSync(full).isDirectory();
   });
-
   for (const d of dirs) {
-    const dir = path.join(ASSETS_DIR, d);
-    const found = fs
-      .readdirSync(dir)
-      .filter((f) => f.endsWith('.mp4'))
-      .map((f) => path.join(dir, f));
-    allClips.push(...found);
+    allClips.push(...getClipsForMood(d as MessageMood));
+  }
+  return allClips;
+}
+
+/**
+ * Select a background video clip matching the given mood.
+ * Prefers clips from the mood-specific directory, falls back to all clips.
+ */
+export function selectBackgroundVideo(mood: MessageMood): string {
+  // Try mood-specific clips first
+  let pool = getClipsForMood(mood).filter((c) => !recentlyUsedClips.includes(c));
+
+  // Fall back to all clips if mood dir is exhausted
+  if (pool.length === 0) {
+    pool = getAllClips().filter((c) => !recentlyUsedClips.includes(c));
   }
 
-  if (allClips.length === 0) {
+  // Last resort: reset and use everything
+  if (pool.length === 0) {
+    pool = getAllClips();
+  }
+
+  if (pool.length === 0) {
     throw new Error(`No background video clips found in ${ASSETS_DIR}`);
   }
-
-  // Filter out recently used clips to avoid repeats in a batch
-  const available = allClips.filter((c) => !recentlyUsedClips.includes(c));
-  const pool = available.length > 0 ? available : allClips;
 
   const selected = pool[Math.floor(Math.random() * pool.length)];
   recentlyUsedClips.push(selected);
@@ -60,33 +79,45 @@ export function selectBackgroundVideo(_mood: MessageMood): string {
 }
 
 /**
- * Select a random background music track.
- * Pools ALL tracks across all mood directories for maximum variety,
- * and avoids repeats within a batch (via recentlyUsedTracks).
+ * Select a background music track matching the given mood.
+ * Prefers tracks from the mood-specific directory, falls back to all tracks.
  */
-export function selectBackgroundMusic(_mood: MessageMood): string | null {
+export function selectBackgroundMusic(mood: MessageMood): string | null {
   if (!fs.existsSync(MUSIC_DIR)) return null;
 
-  // Collect every track across all mood directories
-  const allTracks: string[] = [];
-  const dirs = fs.readdirSync(MUSIC_DIR).filter((d) => {
-    const full = path.join(MUSIC_DIR, d);
-    return fs.statSync(full).isDirectory();
-  });
-
-  for (const d of dirs) {
-    const dir = path.join(MUSIC_DIR, d);
-    const found = fs
-      .readdirSync(dir)
+  const getTracksForMood = (m: string): string[] => {
+    const moodDir = path.join(MUSIC_DIR, m);
+    if (!fs.existsSync(moodDir)) return [];
+    return fs
+      .readdirSync(moodDir)
       .filter((f) => f.endsWith('.mp3'))
-      .map((f) => path.join(dir, f));
-    allTracks.push(...found);
+      .map((f) => path.join(moodDir, f));
+  };
+
+  const getAllTracks = (): string[] => {
+    const all: string[] = [];
+    const dirs = fs.readdirSync(MUSIC_DIR).filter((d) => {
+      const full = path.join(MUSIC_DIR, d);
+      return fs.statSync(full).isDirectory();
+    });
+    for (const d of dirs) {
+      all.push(...getTracksForMood(d));
+    }
+    return all;
+  };
+
+  // Try mood-specific tracks first
+  let pool = getTracksForMood(mood).filter((t) => !recentlyUsedTracks.includes(t));
+
+  if (pool.length === 0) {
+    pool = getAllTracks().filter((t) => !recentlyUsedTracks.includes(t));
   }
 
-  if (allTracks.length === 0) return null;
+  if (pool.length === 0) {
+    pool = getAllTracks();
+  }
 
-  const available = allTracks.filter((t) => !recentlyUsedTracks.includes(t));
-  const pool = available.length > 0 ? available : allTracks;
+  if (pool.length === 0) return null;
 
   const selected = pool[Math.floor(Math.random() * pool.length)];
   recentlyUsedTracks.push(selected);

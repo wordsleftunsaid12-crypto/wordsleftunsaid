@@ -3,6 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { renderVideo, renderCoverFrame, isCinematic, ensureBundle, copyToBundle } from './pipeline/render.js';
 import type { CompositionId } from './pipeline/render.js';
+import { detectMood } from './pipeline/mood.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const OUTPUT_DIR = path.resolve(__dirname, '../output');
@@ -166,14 +167,10 @@ async function main() {
 
       console.log(`Found ${unused.length} unused messages, rendering ${selected.length} for ${targetPlatform}...\n`);
 
-      const moods: Array<'tender' | 'regretful' | 'hopeful' | 'bittersweet' | 'raw'> = [
-        'tender', 'regretful', 'hopeful', 'bittersweet', 'raw',
-      ];
-
       for (const msg of selected) {
         const timestamp = Date.now();
         const outputPath = path.join(OUTPUT_DIR, `${template}-${timestamp}.mp4`);
-        const mood = moods[Math.floor(Math.random() * moods.length)];
+        const mood = detectMood(msg.content, msg.from, msg.to);
 
         console.log(`Rendering: "${msg.content.slice(0, 80)}..."`);
         console.log(`  From: ${msg.from} → To: ${msg.to} | Mood: ${mood}`);

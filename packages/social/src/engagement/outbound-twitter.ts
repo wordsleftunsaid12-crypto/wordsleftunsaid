@@ -35,12 +35,12 @@ const SEARCH_QUERIES = [
  * Empathetic reply templates for X/Twitter (concise, tweet-length).
  */
 const COMMENT_TEMPLATES = [
-  'this really hit home.',
-  'felt every word of this.',
-  'needed to read this today. thank you for sharing.',
-  'the courage to say this, even here, is beautiful.',
-  'some words just stay with you.',
-  'so much truth in this.',
+  'This really hit home.',
+  'Felt every word of this.',
+  'Needed to read this today. Thank you for sharing.',
+  'The courage to say this, even here, is beautiful.',
+  'Some words just stay with you.',
+  'So much truth in this.',
 ];
 
 interface TwitterOutboundResult {

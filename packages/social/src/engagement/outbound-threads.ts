@@ -32,12 +32,12 @@ const SEARCH_QUERIES = [
  * Empathetic comment templates for Threads (casual, warm tone).
  */
 const COMMENT_TEMPLATES = [
-  'this really resonated with me.',
-  'felt every word.',
-  'needed to read this today. thank you.',
-  'the honesty here is beautiful.',
-  'some things just need to be said, even if only here.',
-  'this stopped me scrolling. so real.',
+  'This really resonated with me.',
+  'Felt every word.',
+  'Needed to read this today. Thank you.',
+  'The honesty here is beautiful.',
+  'Some things just need to be said, even if only here.',
+  'This stopped me scrolling. So real.',
 ];
 
 interface ThreadsOutboundResult {

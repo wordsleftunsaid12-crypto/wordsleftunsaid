@@ -25,16 +25,16 @@ const OWN_ACCOUNTS = ['wordsleftunsent', 'Words Left Unsent'];
  * Comment templates for YouTube Shorts (natural, slightly longer than TikTok).
  */
 const COMMENT_TEMPLATES = [
-  'this really resonated with me',
-  'needed to hear this today',
-  'the way this just hit different',
-  'beautifully put into words',
-  'this stopped me mid-scroll',
-  'more people need to see this',
-  'felt this in my soul',
-  'so real it hurts',
-  'sometimes the simplest words carry the most weight',
-  'this is why I keep coming back to Shorts',
+  'This really resonated with me',
+  'Needed to hear this today',
+  'The way this just hit different',
+  'Beautifully put into words',
+  'This stopped me mid-scroll',
+  'More people need to see this',
+  'Felt this in my soul',
+  'So real it hurts',
+  'Sometimes the simplest words carry the most weight',
+  'This is why I keep coming back to Shorts',
 ];
 
 interface OutboundResult {

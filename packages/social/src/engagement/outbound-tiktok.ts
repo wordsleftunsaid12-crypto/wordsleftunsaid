@@ -25,16 +25,16 @@ const OWN_ACCOUNTS = ['u.wordsleftunsaid', 'wordsleftunsaid'];
  * Comment templates for TikTok (shorter, more casual than Instagram).
  */
 const COMMENT_TEMPLATES = [
-  'this really hit different',
-  'needed this today',
-  'the way this just stopped me scrolling',
-  'so real',
-  'this one is staying with me',
-  'felt every word of this',
-  'why is this so relatable',
-  'beautifully said',
-  'this is everything',
-  'more people need to see this',
+  'This really hit different',
+  'Needed this today',
+  'The way this just stopped me scrolling',
+  'So real',
+  'This one is staying with me',
+  'Felt every word of this',
+  'Why is this so relatable',
+  'Beautifully said',
+  'This is everything',
+  'More people need to see this',
 ];
 
 interface OutboundResult {

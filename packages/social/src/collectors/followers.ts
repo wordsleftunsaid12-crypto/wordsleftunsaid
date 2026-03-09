@@ -153,24 +153,42 @@ export async function scrapeYouTubeSubscriberCount(
 async function extractYouTubeCounts(page: Page): Promise<FollowerCounts> {
   let followers = 0;
 
-  // The public channel page shows "X subscribers" near the channel name
+  // Strategy 1: Find the metadata span containing "subscribers" text
+  // YouTube renders subscriber count in a span.yt-content-metadata-view-model__metadata-text
   const subText = await page.evaluate(() => {
-    // Look for subscriber count element
-    const els = document.querySelectorAll('#subscriber-count, [id*="subscriber"], yt-formatted-string');
-    for (const el of els) {
-      const text = el.textContent ?? '';
-      if (text.toLowerCase().includes('subscriber')) {
-        return text;
-      }
+    const spans = document.querySelectorAll(
+      'span.yt-content-metadata-view-model__metadata-text, #subscriber-count, yt-formatted-string#subscriber-count',
+    );
+    for (const el of spans) {
+      const text = el.textContent?.trim() ?? '';
+      if (text.toLowerCase().includes('subscriber')) return text;
     }
-    // Broader fallback: search page text
-    const allText = document.body.innerText;
-    const match = allText.match(/([\d,.]+[KMB]?)\s*subscriber/i);
-    return match ? match[0] : '';
+    return '';
   }).catch(() => '');
 
   if (subText) {
     const match = subText.match(/([\d,.]+[KMB]?)\s*subscriber/i);
+    if (match) {
+      followers = parseAbbreviatedCount(match[1]);
+    }
+  }
+
+  // Strategy 2: meta description tag
+  if (followers === 0) {
+    const metaText = await page.evaluate(() => {
+      const meta = document.querySelector('meta[name="description"]');
+      return meta?.getAttribute('content') ?? '';
+    }).catch(() => '');
+    const match = metaText.match(/([\d,.]+[KMB]?)\s*subscriber/i);
+    if (match) {
+      followers = parseAbbreviatedCount(match[1]);
+    }
+  }
+
+  // Strategy 3: search page body text (last resort)
+  if (followers === 0) {
+    const bodyText = await page.locator('main').first().innerText().catch(() => '');
+    const match = bodyText.match(/([\d,.]+[KMB]?)\s*subscriber/i);
     if (match) {
       followers = parseAbbreviatedCount(match[1]);
     }

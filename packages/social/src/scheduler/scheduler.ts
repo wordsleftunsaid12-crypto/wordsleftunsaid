@@ -6,6 +6,7 @@ import { publishNextScheduled } from './publish-job.js';
 import { runCommentResponder } from '../engagement/comment-responder.js';
 import { collectAllFollowerSnapshots } from '../collectors/followers.js';
 import { seedDailyMessages } from '../content/message-seeder.js';
+import { saveLastRun, getSecondsSinceLastRun, installTimestampLogger } from './state.js';
 
 /** All supported platforms for publishing. */
 const ALL_PLATFORMS = [
@@ -92,6 +93,8 @@ async function runOutboundEngagement(options: { dryRun?: boolean }): Promise<voi
  */
 export async function startScheduler(options: SchedulerOptions = {}): Promise<void> {
   const { dryRun = false, platform } = options;
+
+  installTimestampLogger();
 
   console.log('[scheduler] Starting social media engine...');
   console.log(`[scheduler] Platforms: ${platform ?? 'ALL (' + ALL_PLATFORMS.join(', ') + ')'}`);
@@ -180,11 +183,18 @@ export async function startScheduler(options: SchedulerOptions = {}): Promise<vo
     runJobLoop(job.name, job.fn, job.baseInterval, controller.signal);
   }
 
-  // Run initial pass immediately for all jobs
+  // Run initial pass — skip jobs that ran recently (survives restarts)
   console.log('[scheduler] Running initial pass...');
   for (const job of jobs) {
+    const elapsed = getSecondsSinceLastRun(job.name);
+    if (elapsed !== null && elapsed * 1000 < job.baseInterval) {
+      const minAgo = Math.round(elapsed / 60);
+      console.log(`[scheduler] Skipping ${job.name} — ran ${minAgo} min ago`);
+      continue;
+    }
     try {
       await job.fn();
+      saveLastRun(job.name);
     } catch (err) {
       console.error(`[scheduler] Initial ${job.name} failed:`, err);
     }
@@ -235,6 +245,7 @@ async function runJobLoop(
 
     try {
       await fn();
+      saveLastRun(name);
     } catch (err) {
       console.error(`[scheduler] ${name} error:`, err);
     }

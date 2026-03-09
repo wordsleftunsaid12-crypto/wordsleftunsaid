@@ -5,12 +5,19 @@ import {
   getLatestStrategyBrief,
   getMessageById,
 } from '@wlu/shared';
-import type { StrategyBrief, Platform } from '@wlu/shared';
+import type { StrategyBrief, Platform, MessageMood } from '@wlu/shared';
 import { CAPTION_SYSTEM_PROMPT, CAPTION_USER_PROMPT } from './prompts.js';
+import { buildCaption } from './templates.js';
 
 interface CaptionResult {
   caption: string;
   hashtags: string[];
+}
+
+/** Check if the Anthropic API key looks valid (real keys are 100+ chars). */
+function hasApiKey(): boolean {
+  const key = process.env.ANTHROPIC_API_KEY;
+  return typeof key === 'string' && key.startsWith('sk-ant-') && key.length > 40;
 }
 
 function getClient(): Anthropic {
@@ -19,11 +26,24 @@ function getClient(): Anthropic {
 
 /**
  * Generate a caption and hashtags for a single message.
+ * Falls back to pre-written templates when no ANTHROPIC_API_KEY is configured.
  */
 export async function generateCaption(
   message: { from: string; to: string; content: string },
   platform: Platform = 'instagram',
+  mood?: string | null,
 ): Promise<CaptionResult> {
+  // Fallback: use template-based captions when no API key
+  if (!hasApiKey()) {
+    const templatePlatform = (['instagram', 'tiktok', 'youtube'] as const).includes(
+      platform as 'instagram' | 'tiktok' | 'youtube',
+    )
+      ? (platform as 'instagram' | 'tiktok' | 'youtube')
+      : 'instagram';
+    const moodValue: MessageMood = isValidMood(mood) ? mood : 'bittersweet';
+    return buildCaption(moodValue, templatePlatform);
+  }
+
   const client = getClient();
 
   // Pull in latest strategy guidelines if available
@@ -73,6 +93,12 @@ export async function generateCaption(
   return result;
 }
 
+const VALID_MOODS: MessageMood[] = ['tender', 'regretful', 'hopeful', 'bittersweet', 'raw'];
+
+function isValidMood(mood: string | null | undefined): mood is MessageMood {
+  return typeof mood === 'string' && VALID_MOODS.includes(mood as MessageMood);
+}
+
 /**
  * Process all pending items in the content queue — generate captions and update status.
  * Returns the number of items captioned.
@@ -101,7 +127,7 @@ export async function captionPendingItems(
         message = { from: 'Someone', to: 'Someone else', content: 'An unsent message' };
       }
 
-      const { caption, hashtags } = await generateCaption(message, platform);
+      const { caption, hashtags } = await generateCaption(message, platform, item.mood);
 
       if (dryRun) {
         console.log(`[caption] [DRY RUN] ${item.id}: "${caption}" ${hashtags.join(' ')}`);

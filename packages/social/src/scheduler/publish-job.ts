@@ -149,9 +149,17 @@ export async function publishNextScheduled(
 
     return true;
   } catch (err) {
-    console.error(`[publish-job] Failed to publish ${item.id}:`, err);
+    const msg = err instanceof Error ? err.message : String(err);
+
+    // Rate-limited items stay scheduled — they'll retry next cycle/day
+    if (msg.includes('Daily posting limit')) {
+      console.log(`[publish-job] ${platform} daily limit reached — skipping ${item.id.slice(0, 8)}`);
+      return false;
+    }
+
+    console.error(`[publish-job] Failed to publish ${item.id}:`, msg);
     await updateContentQueueStatus(item.id, 'failed', {
-      errorMessage: err instanceof Error ? err.message : String(err),
+      errorMessage: msg,
     });
     return false;
   }

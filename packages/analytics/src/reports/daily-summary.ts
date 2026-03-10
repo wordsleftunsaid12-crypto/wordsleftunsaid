@@ -9,7 +9,8 @@ import {
   getTodayPosts,
   getRecentPosts,
 } from '@wlu/shared';
-import type { Platform, Post } from '@wlu/shared';
+import type { Platform } from '@wlu/shared';
+import { getWebsiteMetrics, getYesterdayMetrics } from './ga4.js';
 
 const ALL_PLATFORMS: Platform[] = [
   'instagram', 'tiktok', 'youtube',
@@ -197,13 +198,38 @@ export async function generateDailySummary(): Promise<void> {
   console.log(`  Followers vs yesterday:  ${arrow(totalChangeToday)} ${changeStr(totalChangeToday)}`);
   console.log(`  Followers vs last week:  ${arrow(totalChangeWeek)} ${changeStr(totalChangeWeek)}`);
 
-  // Website analytics note
+  // Website analytics
   console.log('');
-  console.log('  WEBSITE');
+  console.log('  WEBSITE (wordsleftunsent.com)');
   console.log('  ' + '\u2500'.repeat(40));
-  console.log('  GA4 property: G-CPHLT2VM2D');
-  console.log('  Dashboard: https://analytics.google.com');
-  console.log('  UTM tracking active: reddit, twitter, threads, pinterest');
+
+  const todayWeb = await getWebsiteMetrics('today', 'today');
+  const yesterdayWeb = await getYesterdayMetrics();
+
+  if (todayWeb) {
+    const visitorChange = yesterdayWeb ? todayWeb.visitors - yesterdayWeb.visitors : 0;
+    const pvChange = yesterdayWeb ? todayWeb.pageviews - yesterdayWeb.pageviews : 0;
+
+    console.log(`  Visitors:    ${String(todayWeb.visitors).padStart(4)}  ${yesterdayWeb ? `(${changeStr(visitorChange)} vs yesterday)` : ''}`);
+    console.log(`  Pageviews:   ${String(todayWeb.pageviews).padStart(4)}  ${yesterdayWeb ? `(${changeStr(pvChange)} vs yesterday)` : ''}`);
+
+    if (todayWeb.topSources.length > 0) {
+      const srcStr = todayWeb.topSources
+        .map((s) => `${s.source} (${s.count})`)
+        .join(', ');
+      console.log(`  Top sources: ${srcStr}`);
+    }
+
+    if (todayWeb.topPages.length > 0) {
+      const pageStr = todayWeb.topPages
+        .map((p) => `${p.path} (${p.count})`)
+        .join(', ');
+      console.log(`  Top pages:   ${pageStr}`);
+    }
+  } else {
+    console.log('  GA4 not configured \u2014 set GA4_PROPERTY_ID in .env');
+    console.log('  and save service account key to ~/.wlu-ga4-credentials.json');
+  }
 
   console.log('');
   console.log('\u2550'.repeat(50));

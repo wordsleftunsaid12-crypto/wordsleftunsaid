@@ -16,7 +16,7 @@ const LIMITS = {
   minDelayBetweenActions: 6000, // 6 seconds between actions
 } as const;
 
-const OWN_ACCOUNTS = ['u.wordsleftunsaid', 'wordsleftunsent'];
+const OWN_ACCOUNTS = ['u.wordsleftunsent', 'wordsleftunsent'];
 
 /** Search terms to find relatable content on Threads. */
 const SEARCH_QUERIES = [

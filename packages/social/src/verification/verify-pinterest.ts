@@ -15,7 +15,7 @@ export async function verifyPinterestPost(post: Post): Promise<VerificationResul
   const { context, page } = await launchPinterest();
 
   try {
-    await page.goto('https://www.pinterest.com/wordsleftunsaid/_created/', {
+    await page.goto('https://www.pinterest.com/wordsleftunsent/_created/', {
       waitUntil: 'domcontentloaded',
       timeout: 30000,
     });

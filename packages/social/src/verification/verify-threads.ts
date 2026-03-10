@@ -15,7 +15,7 @@ export async function verifyThreadsPost(post: Post): Promise<VerificationResult>
   const { context, page } = await launchThreads();
 
   try {
-    await page.goto('https://www.threads.net/@u.wordsleftunsaid', {
+    await page.goto('https://www.threads.net/@u.wordsleftunsent', {
       waitUntil: 'domcontentloaded',
       timeout: 30000,
     });

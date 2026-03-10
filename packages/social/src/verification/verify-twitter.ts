@@ -15,7 +15,7 @@ export async function verifyTwitterPost(post: Post): Promise<VerificationResult>
   const { context, page } = await launchTwitter();
 
   try {
-    await page.goto('https://x.com/wordsleftunsaid', {
+    await page.goto('https://x.com/unsentwords12', {
       waitUntil: 'domcontentloaded',
       timeout: 30000,
     });

@@ -280,7 +280,7 @@ async function extractRedditCounts(page: Page): Promise<FollowerCounts> {
 // --- Threads ---
 
 export async function scrapeThreadsFollowerCounts(
-  username = 'u.wordsleftunsaid',
+  username = 'u.wordsleftunsent',
 ): Promise<FollowerCounts> {
   const { context, page } = await launchThreads();
   try {

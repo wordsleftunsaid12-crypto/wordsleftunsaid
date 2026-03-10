@@ -159,44 +159,55 @@ async function createPin(
   }
 
   // Select board — required for publishing.
-  // Pinterest's board picker is a custom dropdown, not a standard <select>.
+  // Pinterest's board picker opens as a dropdown with Search + "Create board".
   console.log('[pinterest-publish] Selecting board...');
-  const boardSelect = page.getByText('Choose a board').first()
-    .or(page.locator('[data-test-id="board-dropdown"]').first());
-  if (await boardSelect.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await boardSelect.click({ force: true });
+  const boardDropdown = page.locator('button:has-text("Choose a board"), [data-test-id="board-dropdown"], div:has-text("Choose a board") >> visible=true').first();
+  if (await boardDropdown.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await boardDropdown.click({ force: true });
     await page.waitForTimeout(2000);
     await page.screenshot({ path: '/tmp/pinterest-board-picker.png' }).catch(() => {});
 
-    // Look for an existing board or create one
+    // Type board name in the search box to filter
+    const searchInput = page.locator('input[placeholder="Search"]').first();
+    if (await searchInput.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await searchInput.fill('Unsent Letters');
+      await page.waitForTimeout(1500);
+    }
+
+    // Check if "Unsent Letters" board appears in results
     const existingBoard = page.getByText('Unsent Letters', { exact: false }).first();
     if (await existingBoard.isVisible({ timeout: 2000 }).catch(() => false)) {
       await existingBoard.click();
       console.log('[pinterest-publish] Selected existing board: Unsent Letters');
     } else {
-      // Create new board
+      // Board doesn't exist — create it
+      console.log('[pinterest-publish] Board not found, creating "Unsent Letters"...');
       const createBoard = page.getByText('Create board', { exact: false }).first();
-      if (await createBoard.isVisible({ timeout: 2000 }).catch(() => false)) {
+      if (await createBoard.isVisible({ timeout: 3000 }).catch(() => false)) {
         await createBoard.click();
-        await page.waitForTimeout(1000);
-        const boardNameInput = page.locator('input[placeholder*="board name" i], input[id*="boardName"], input[name*="board"]').first();
-        if (await boardNameInput.isVisible({ timeout: 2000 }).catch(() => false)) {
-          await boardNameInput.fill('Unsent Letters');
+        await page.waitForTimeout(2000);
+        await page.screenshot({ path: '/tmp/pinterest-create-board.png' }).catch(() => {});
+
+        // The create-board dialog may pre-fill with search text or show an input
+        // Try multiple selectors for the board name input
+        const boardInput = page.locator('input[type="text"]').last();
+        if (await boardInput.isVisible({ timeout: 3000 }).catch(() => false)) {
+          await boardInput.clear();
+          await boardInput.fill('Unsent Letters');
           await page.waitForTimeout(500);
-          const createBtn = page.getByRole('button', { name: /^Create$/i }).first();
-          if (await createBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-            await createBtn.click({ force: true });
-            await page.waitForTimeout(2000);
-            console.log('[pinterest-publish] Created new board: Unsent Letters');
-          }
+        }
+
+        // Click Create button
+        const createBtn = page.getByRole('button', { name: /Create/i }).first();
+        if (await createBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+          await createBtn.click({ force: true });
+          await page.waitForTimeout(3000);
+          console.log('[pinterest-publish] Created board: Unsent Letters');
+        } else {
+          console.warn('[pinterest-publish] Create button not found');
         }
       } else {
-        // No boards at all — just click the first option if any
-        const anyBoard = page.locator('[data-test-id="board-row"]').first();
-        if (await anyBoard.isVisible({ timeout: 2000 }).catch(() => false)) {
-          await anyBoard.click();
-          console.log('[pinterest-publish] Selected first available board');
-        }
+        console.warn('[pinterest-publish] Create board option not found');
       }
     }
     await page.waitForTimeout(1000);

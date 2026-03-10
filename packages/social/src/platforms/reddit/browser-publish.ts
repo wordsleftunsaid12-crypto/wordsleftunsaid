@@ -36,6 +36,8 @@ export async function browserPublishReddit(options: {
   messageTo?: string;
   /** The "From" field from the message. */
   messageFrom?: string;
+  /** UTM-tracked link to the message page. */
+  utmUrl?: string;
 }): Promise<RedditPublishResult> {
   const todayCount = await getPostCountToday('reddit');
   if (todayCount >= MAX_POSTS_PER_DAY) {
@@ -55,7 +57,8 @@ export async function browserPublishReddit(options: {
 
   const body = options.messageContent ?? options.caption.split('\n')[0];
   const attribution = options.messageFrom ? `\n\n— *${options.messageFrom}*` : '';
-  const footer = `${attribution}\n\n---\n*Read more anonymous messages at [wordsleftunsent.com](https://wordsleftunsent.com)*`;
+  const linkUrl = options.utmUrl ?? 'https://wordsleftunsent.com';
+  const footer = `${attribution}\n\n---\n*Read more anonymous messages at [wordsleftunsent.com](${linkUrl})*`;
 
   if (options.dryRun) {
     console.log('[reddit-publish] [DRY RUN] Would post to r/' + subreddit);

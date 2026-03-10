@@ -344,6 +344,35 @@ async function extractPinterestCounts(page: Page): Promise<FollowerCounts> {
   return { followers, following };
 }
 
+// --- Per-platform scraper map (exported for scheduler lock integration) ---
+
+const SCRAPER_MAP: Record<Platform, () => Promise<FollowerCounts>> = {
+  instagram: scrapeInstagramFollowerCounts,
+  tiktok: scrapeTikTokFollowerCounts,
+  youtube: scrapeYouTubeSubscriberCount,
+  twitter: scrapeTwitterFollowerCounts,
+  reddit: scrapeRedditFollowerCounts,
+  threads: scrapeThreadsFollowerCounts,
+  pinterest: scrapePinterestFollowerCounts,
+};
+
+/**
+ * Collect a follower snapshot for a single platform.
+ */
+export async function collectFollowerSnapshot(platform: Platform): Promise<void> {
+  const scraper = SCRAPER_MAP[platform];
+  if (!scraper) throw new Error(`No follower scraper for ${platform}`);
+
+  console.log(`[followers] Scraping ${platform}...`);
+  const counts = await scraper();
+  await saveFollowerSnapshot({
+    platform,
+    followerCount: counts.followers,
+    followingCount: counts.following,
+  });
+  console.log(`[followers] Saved ${platform} snapshot`);
+}
+
 // --- Multi-platform collection ---
 
 interface CollectionResult {

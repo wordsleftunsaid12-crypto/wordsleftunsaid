@@ -61,6 +61,12 @@ async function main(): Promise<void> {
       break;
     }
 
+    case 'daily-summary': {
+      const { generateDailySummary } = await import('./reports/daily-summary.js');
+      await generateDailySummary();
+      break;
+    }
+
     default:
       console.log('Usage: tsx src/index.ts <command> [days]');
       console.log('\nCommands:');
@@ -68,6 +74,7 @@ async function main(): Promise<void> {
       console.log('  report [days]     Generate engagement report (default: 30 days)');
       console.log('  strategy [days]   Generate strategy brief from performance data');
       console.log('  learn             Run full learn cycle (collect + analyze + strategy)');
+      console.log('  daily-summary     Generate daily summary with followers, posts, and trends');
   }
 }
 

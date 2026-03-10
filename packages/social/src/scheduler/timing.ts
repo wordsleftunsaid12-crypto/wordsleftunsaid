@@ -32,4 +32,6 @@ export const INTERVALS = {
   RENDER: 4 * 3600000,       // 4 hours base → 2.8-5.2 hours with jitter
   METRICS: 12 * 3600000,     // 12 hours base → twice daily with jitter
   LEARN: 24 * 3600000,       // 24 hours (once daily)
+  VERIFY: 15 * 60000,        // 15 min base → 10-20 min with jitter
+  DAILY_SUMMARY: 24 * 3600000, // 24 hours (once daily)
 } as const;

@@ -25,6 +25,7 @@ export async function browserPublishThreads(options: {
   messageContent?: string;
   messageTo?: string;
   messageFrom?: string;
+  utmUrl?: string;
 }): Promise<ThreadsPublishResult> {
   const todayCount = await getPostCountToday('threads');
   if (todayCount >= MAX_POSTS_PER_DAY) {
@@ -35,9 +36,9 @@ export async function browserPublishThreads(options: {
 
   // Build thread text — message quote + link
   const messageId = options.messageIds?.[0];
-  const link = messageId
+  const link = options.utmUrl ?? (messageId
     ? `https://wordsleftunsent.com/messages/${messageId}`
-    : 'https://wordsleftunsent.com';
+    : 'https://wordsleftunsent.com');
 
   // Use original message content, fall back to caption first line
   const quote = options.messageContent

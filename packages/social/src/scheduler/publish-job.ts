@@ -8,6 +8,7 @@ import {
 } from '@wlu/shared';
 import type { Message } from '@wlu/shared';
 import { browserPublishReel } from '../platforms/instagram/browser-publish.js';
+import { buildUtmUrl } from '../utils/utm.js';
 
 /** Platforms to auto-cross-post to after a successful publish. */
 const CROSS_POST_TARGETS: Record<string, string[]> = {
@@ -20,7 +21,8 @@ const CROSS_POST_TARGETS: Record<string, string[]> = {
   threads: [],
 };
 
-/** CTA domain kept clean — no UTM params in captions (users type URLs manually). */
+/** Platforms that include clickable links in their posts (get UTM tracking). */
+const LINK_PLATFORMS = new Set(['reddit', 'twitter', 'threads', 'pinterest']);
 
 /** Default hashtags appended to TikTok posts for discovery. */
 const TIKTOK_DEFAULT_HASHTAGS = [
@@ -70,6 +72,16 @@ export async function publishNextScheduled(
     }
 
     const rawCaption = `${item.caption ?? ''}\n\n${hashtagString}`.trim();
+
+    // Build UTM-tracked URL for text platforms that include links
+    const messageId = item.messageIds?.[0];
+    const baseUrl = messageId
+      ? `https://wordsleftunsent.com/messages/${messageId}`
+      : 'https://wordsleftunsent.com';
+    const utmUrl = LINK_PLATFORMS.has(platform)
+      ? buildUtmUrl(baseUrl, platform, item.id)
+      : undefined;
+
     const publishOptions = {
       videoPath: item.videoPath,
       coverImagePath: item.coverImagePath ?? undefined,
@@ -83,6 +95,8 @@ export async function publishNextScheduled(
       messageContent: sourceMessage?.content,
       messageTo: sourceMessage?.to,
       messageFrom: sourceMessage?.from,
+      // UTM-tracked URL for platforms that include links
+      utmUrl,
     };
 
     let result: { postId: string; platformPostId: string | null };

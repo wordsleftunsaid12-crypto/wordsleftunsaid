@@ -28,6 +28,7 @@ export async function browserPublishPinterest(options: {
   messageContent?: string;
   messageTo?: string;
   messageFrom?: string;
+  utmUrl?: string;
 }): Promise<PinterestPublishResult> {
   const todayCount = await getPostCountToday('pinterest');
   if (todayCount >= MAX_POSTS_PER_DAY) {
@@ -47,11 +48,11 @@ export async function browserPublishPinterest(options: {
     );
   }
 
-  // Build link to message page
+  // Build link to message page (with UTM if available)
   const messageId = options.messageIds?.[0];
-  const pinUrl = messageId
+  const pinUrl = options.utmUrl ?? (messageId
     ? `https://wordsleftunsent.com/messages/${messageId}`
-    : 'https://wordsleftunsent.com';
+    : 'https://wordsleftunsent.com');
 
   // Build pin description from message content (not IG caption)
   const quote = options.messageContent ?? options.caption.split('\n')[0];

@@ -170,6 +170,28 @@ export async function getUsedMessageIds(): Promise<string[]> {
   return [...ids];
 }
 
+/**
+ * Get overdue scheduled items (scheduled_for < now) for a platform.
+ */
+export async function getOverdueItems(
+  platform?: string,
+): Promise<ContentQueueItem[]> {
+  const client = getServiceClient();
+
+  let query = client
+    .from('content_queue')
+    .select('*')
+    .eq('status', 'scheduled')
+    .lt('scheduled_for', new Date().toISOString())
+    .order('scheduled_for', { ascending: true });
+
+  if (platform) query = query.eq('platform', platform);
+
+  const { data, error } = await query;
+  if (error) throw new Error(`Failed to fetch overdue items: ${error.message}`);
+  return (data as Record<string, unknown>[]).map(mapRow);
+}
+
 export async function getContentQueueItemByVideoPath(
   videoPath: string,
 ): Promise<ContentQueueItem | null> {

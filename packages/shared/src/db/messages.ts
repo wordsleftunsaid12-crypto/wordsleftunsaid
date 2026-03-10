@@ -86,6 +86,7 @@ export async function createMessage(input: CreateMessageInput): Promise<Message>
     approved: false,
     created_at: new Date().toISOString(),
     like_count: 0,
+    seeded: false,
   };
 }
 

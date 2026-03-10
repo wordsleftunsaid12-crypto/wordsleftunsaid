@@ -23,6 +23,10 @@ function mapPost(row: Row): Post {
     isExploration: row.is_exploration as boolean,
     postedAt: row.posted_at as string,
     createdAt: row.created_at as string,
+    verified: (row.verified as boolean | null) ?? null,
+    verifiedAt: (row.verified_at as string | null) ?? null,
+    verificationError: (row.verification_error as string | null) ?? null,
+    platformPostUrl: (row.platform_post_url as string | null) ?? null,
   };
 }
 
@@ -192,6 +196,83 @@ export async function getPostCountToday(platform: Platform): Promise<number> {
 
   if (error) throw new Error(`Failed to count today's posts: ${error.message}`);
   return count ?? 0;
+}
+
+/**
+ * Get posts from today for a specific platform.
+ */
+export async function getTodayPosts(platform?: Platform): Promise<Post[]> {
+  const client = getServiceClient();
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+
+  let query = client
+    .from('posts')
+    .select('*')
+    .gte('posted_at', today.toISOString())
+    .order('posted_at', { ascending: false });
+
+  if (platform) query = query.eq('platform', platform);
+
+  const { data, error } = await query;
+  if (error) throw new Error(`Failed to fetch today's posts: ${error.message}`);
+  return (data as Row[]).map(mapPost);
+}
+
+/**
+ * Get unverified posts from the last N hours.
+ * Returns posts where verified is NULL (unchecked).
+ */
+export async function getUnverifiedPosts(
+  hoursBack: number = 24,
+): Promise<Post[]> {
+  const client = getServiceClient();
+  const since = new Date(Date.now() - hoursBack * 3600000).toISOString();
+
+  const { data, error } = await client
+    .from('posts')
+    .select('*')
+    .is('verified', null)
+    .gte('posted_at', since)
+    .order('posted_at', { ascending: false });
+
+  if (error) throw new Error(`Failed to fetch unverified posts: ${error.message}`);
+  return (data as Row[]).map(mapPost);
+}
+
+/**
+ * Update the verification status of a post.
+ */
+export async function updatePostVerification(
+  id: string,
+  input: {
+    verified: boolean;
+    verificationError?: string;
+    platformPostUrl?: string;
+  },
+): Promise<Post> {
+  const client = getServiceClient();
+
+  const update: Record<string, unknown> = {
+    verified: input.verified,
+    verified_at: new Date().toISOString(),
+  };
+  if (input.verificationError !== undefined) {
+    update.verification_error = input.verificationError;
+  }
+  if (input.platformPostUrl !== undefined) {
+    update.platform_post_url = input.platformPostUrl;
+  }
+
+  const { data, error } = await client
+    .from('posts')
+    .update(update)
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) throw new Error(`Failed to update post verification: ${error.message}`);
+  return mapPost(data as Row);
 }
 
 /**

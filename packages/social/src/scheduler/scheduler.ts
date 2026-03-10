@@ -1,18 +1,31 @@
+import { resolve } from 'node:path';
 import { jitteredInterval, INTERVALS } from './timing.js';
-import { scheduleCaptionedItems, getQueueStatus } from './queue.js';
+import { scheduleCaptionedItems, getQueueStatus, catchUpMissedSlots } from './queue.js';
 import { captionPendingItems } from '../captions/generate.js';
 import { ingestNewVideos } from '../ingest.js';
 import { publishNextScheduled } from './publish-job.js';
 import { runCommentResponder } from '../engagement/comment-responder.js';
-import { collectAllFollowerSnapshots } from '../collectors/followers.js';
+import { collectFollowerSnapshot } from '../collectors/followers.js';
 import { seedDailyMessages } from '../content/message-seeder.js';
 import { saveLastRun, getSecondsSinceLastRun, installTimestampLogger } from './state.js';
+import { withBrowserLock } from '../platforms/browser-lock.js';
 
 /** All supported platforms for publishing. */
 const ALL_PLATFORMS = [
   'instagram', 'tiktok', 'youtube',
   'reddit', 'pinterest', 'twitter', 'threads',
 ] as const;
+
+/** Map platform → browser session directory for lock coordination. */
+const SESSION_DIRS: Record<string, string> = {
+  instagram: resolve(process.env.HOME ?? '.', '.wlu-instagram-session'),
+  tiktok: resolve(process.env.HOME ?? '.', '.wlu-tiktok-session'),
+  youtube: resolve(process.env.HOME ?? '.', '.wlu-youtube-session'),
+  reddit: resolve(process.env.HOME ?? '.', '.wlu-reddit-session'),
+  pinterest: resolve(process.env.HOME ?? '.', '.wlu-pinterest-session'),
+  twitter: resolve(process.env.HOME ?? '.', '.wlu-twitter-session'),
+  threads: resolve(process.env.HOME ?? '.', '.wlu-threads-session'),
+};
 
 /** Platforms with outbound engagement modules. */
 const OUTBOUND_PLATFORMS = ['instagram', 'tiktok', 'youtube', 'reddit', 'twitter', 'threads'] as const;
@@ -31,8 +44,15 @@ interface SchedulerOptions {
 async function publishAllPlatforms(options: { dryRun?: boolean; platform?: Platform }): Promise<void> {
   const platforms = options.platform ? [options.platform] : [...ALL_PLATFORMS];
   for (const p of platforms) {
+    const sessionDir = SESSION_DIRS[p];
     try {
-      await publishNextScheduled({ platform: p, dryRun: options.dryRun });
+      if (sessionDir) {
+        await withBrowserLock(sessionDir, () =>
+          publishNextScheduled({ platform: p, dryRun: options.dryRun }),
+        );
+      } else {
+        await publishNextScheduled({ platform: p, dryRun: options.dryRun });
+      }
     } catch (err) {
       console.error(`[scheduler] publish ${p} failed:`, err instanceof Error ? err.message : err);
     }
@@ -47,9 +67,10 @@ async function runOutboundEngagement(options: { dryRun?: boolean }): Promise<voi
   const { dryRun = false } = options;
   // Pick a random platform each cycle to avoid running all browsers at once
   const platform = OUTBOUND_PLATFORMS[Math.floor(Math.random() * OUTBOUND_PLATFORMS.length)];
+  const sessionDir = SESSION_DIRS[platform];
   console.log(`[scheduler] Outbound engagement on ${platform}...`);
 
-  try {
+  const doOutbound = async (): Promise<void> => {
     switch (platform) {
       case 'instagram': {
         const { runOutboundSession } = await import('../engagement/outbound.js');
@@ -81,6 +102,14 @@ async function runOutboundEngagement(options: { dryRun?: boolean }): Promise<voi
         await runThreadsOutboundSession({ dryRun });
         break;
       }
+    }
+  };
+
+  try {
+    if (sessionDir) {
+      await withBrowserLock(sessionDir, doOutbound);
+    } else {
+      await doOutbound();
     }
   } catch (err) {
     console.error(`[scheduler] outbound ${platform} failed:`, err instanceof Error ? err.message : err);
@@ -129,12 +158,27 @@ export async function startScheduler(options: SchedulerOptions = {}): Promise<vo
     {
       name: 'comment-reply',
       baseInterval: INTERVALS.COMMENT_REPLY,
-      fn: () => runCommentResponder({ dryRun }),
+      fn: () => withBrowserLock(SESSION_DIRS.instagram, () => runCommentResponder({ dryRun })),
     },
     {
       name: 'follower-snapshot',
       baseInterval: INTERVALS.METRICS,
-      fn: () => collectAllFollowerSnapshots(),
+      fn: async () => {
+        // Follower snapshots open browsers for each platform sequentially.
+        // Lock each one to avoid conflicts with other jobs.
+        for (const p of ALL_PLATFORMS) {
+          const dir = SESSION_DIRS[p];
+          if (dir) {
+            await withBrowserLock(dir, async () => {
+              try {
+                await collectFollowerSnapshot(p);
+              } catch (err) {
+                console.error(`[scheduler] follower ${p} failed:`, err instanceof Error ? err.message : err);
+              }
+            });
+          }
+        }
+      },
     },
     {
       name: 'outbound-engagement',
@@ -172,6 +216,33 @@ export async function startScheduler(options: SchedulerOptions = {}): Promise<vo
         }
       },
     },
+    {
+      name: 'verify-posts',
+      baseInterval: INTERVALS.VERIFY,
+      fn: async () => {
+        const { verifyRecentPosts } = await import('../verification/verify-post.js');
+        await verifyRecentPosts();
+      },
+    },
+    {
+      name: 'daily-summary',
+      baseInterval: INTERVALS.DAILY_SUMMARY,
+      fn: async () => {
+        try {
+          const { execFile } = await import('node:child_process');
+          const { promisify } = await import('node:util');
+          const exec = promisify(execFile);
+          const result = await exec('npx', ['tsx', 'packages/analytics/src/index.ts', 'daily-summary'], {
+            cwd: process.cwd(),
+            env: { ...process.env, PATH: `/opt/homebrew/bin:${process.env.PATH}` },
+            timeout: 2 * 60 * 1000,
+          });
+          if (result.stdout) console.log(result.stdout);
+        } catch (err) {
+          console.warn('[scheduler] Daily summary failed:', err instanceof Error ? err.message : err);
+        }
+      },
+    },
   ];
 
   // Run each job on its own jittered interval loop
@@ -181,6 +252,17 @@ export async function startScheduler(options: SchedulerOptions = {}): Promise<vo
     const controller = new AbortController();
     controllers.push(controller);
     runJobLoop(job.name, job.fn, job.baseInterval, controller.signal);
+  }
+
+  // Catch up any missed/overdue scheduled items before running jobs
+  console.log('[scheduler] Checking for overdue scheduled items...');
+  const catchUpPlatforms = platform ? [platform] : [...ALL_PLATFORMS];
+  for (const p of catchUpPlatforms) {
+    try {
+      await catchUpMissedSlots(p as Platform);
+    } catch (err) {
+      console.error(`[scheduler] catch-up ${p} failed:`, err instanceof Error ? err.message : err);
+    }
   }
 
   // Run initial pass — skip jobs that ran recently (survives restarts)

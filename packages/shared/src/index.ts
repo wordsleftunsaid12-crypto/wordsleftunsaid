@@ -52,6 +52,7 @@ export {
   getNextScheduledItem,
   getContentQueueItemByVideoPath,
   getUsedMessageIds,
+  getOverdueItems,
 } from './db/content-queue.js';
 
 // Database — Posts, Engagement, Comments, Strategy
@@ -77,6 +78,9 @@ export {
   getScheduleConfig,
   hasPostForMessages,
   hasQueueItemForMessages,
+  getTodayPosts,
+  getUnverifiedPosts,
+  updatePostVerification,
 } from './db/posts.js';
 
 // Utils

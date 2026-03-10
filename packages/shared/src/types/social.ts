@@ -25,6 +25,10 @@ export interface Post {
   isExploration: boolean;
   postedAt: string;
   createdAt: string;
+  verified: boolean | null;
+  verifiedAt: string | null;
+  verificationError: string | null;
+  platformPostUrl: string | null;
 }
 
 export interface ContentQueueItem {

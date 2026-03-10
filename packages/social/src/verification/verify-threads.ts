@@ -1,5 +1,6 @@
 import type { Post } from '@wlu/shared';
 import { launchThreads } from '../platforms/threads/browser.js';
+import { extractSnippet, textContains } from './match-utils.js';
 
 interface VerificationResult {
   verified: boolean;
@@ -14,20 +15,19 @@ export async function verifyThreadsPost(post: Post): Promise<VerificationResult>
   const { context, page } = await launchThreads();
 
   try {
-    // Navigate to profile
     await page.goto('https://www.threads.net/@u.wordsleftunsaid', {
       waitUntil: 'domcontentloaded',
       timeout: 30000,
     });
     await page.waitForTimeout(5000);
 
-    const snippet = post.caption?.slice(0, 30) ?? '';
+    const snippet = extractSnippet(post.caption);
     if (!snippet) {
       return { verified: false, error: 'No caption to match against' };
     }
 
-    const pageText = await page.textContent('body') ?? '';
-    if (pageText.includes(snippet)) {
+    const pageText = await page.textContent('body').catch(() => '') ?? '';
+    if (textContains(pageText, snippet)) {
       return { verified: true };
     }
 

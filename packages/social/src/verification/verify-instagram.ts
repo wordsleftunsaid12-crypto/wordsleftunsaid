@@ -1,5 +1,6 @@
 import type { Post } from '@wlu/shared';
 import { launchInstagram, navigateToProfile } from '../platforms/instagram/browser.js';
+import { extractSnippet, textContains } from './match-utils.js';
 
 interface VerificationResult {
   verified: boolean;
@@ -8,42 +9,48 @@ interface VerificationResult {
 }
 
 /**
- * Verify an Instagram post exists by checking the profile's most recent post caption.
+ * Verify an Instagram post exists by checking the profile's most recent post.
  */
 export async function verifyInstagramPost(post: Post): Promise<VerificationResult> {
   const { context, page } = await launchInstagram();
 
   try {
     await navigateToProfile(page, 'u.wordsleftunsaid');
-    await page.waitForTimeout(3000);
 
-    // Click the most recent post (top-left in grid)
-    const firstPost = page.locator('article a[href*="/p/"], a[href*="/reel/"]').first();
-    if (!(await firstPost.isVisible({ timeout: 5000 }).catch(() => false))) {
+    // Check that the profile actually loaded
+    const profileLoaded = await page.locator('header section').isVisible({ timeout: 10000 }).catch(() => false);
+    if (!profileLoaded) {
+      return { verified: false, error: 'Instagram profile did not load' };
+    }
+
+    // Check if at least one post exists in the grid
+    const firstPost = page.locator('a[href*="/p/"], a[href*="/reel/"]').first();
+    const hasPost = await firstPost.isVisible({ timeout: 5000 }).catch(() => false);
+    if (!hasPost) {
       return { verified: false, error: 'No posts visible on profile' };
     }
 
-    await firstPost.click();
-    await page.waitForTimeout(3000);
+    const href = await firstPost.getAttribute('href').catch(() => null);
+    const postUrl = href ? `https://www.instagram.com${href}` : undefined;
 
-    // Get the post URL
-    const postUrl = page.url();
-
-    // Check caption text
-    const captionEl = page.locator('h1, span').filter({ hasText: post.caption?.slice(0, 30) ?? '' }).first();
-    const found = await captionEl.isVisible({ timeout: 5000 }).catch(() => false);
-
-    if (found) {
+    const snippet = extractSnippet(post.caption);
+    if (!snippet) {
       return { verified: true, postUrl };
     }
 
-    // Fallback: check if the post URL changed (meaning we did open a post)
-    if (postUrl.includes('/p/') || postUrl.includes('/reel/')) {
-      // The most recent post exists but caption didn't match — might be a different post
-      return { verified: false, error: 'Most recent post caption does not match' };
+    // Click the first post and check caption
+    await firstPost.click();
+    await page.waitForTimeout(3000);
+
+    // Look for caption text in the expanded post dialog
+    const dialogText = await page.locator('article, [role="dialog"]').first()
+      .textContent({ timeout: 5000 }).catch(() => '') ?? '';
+
+    if (textContains(dialogText, snippet)) {
+      return { verified: true, postUrl: page.url() };
     }
 
-    return { verified: false, error: 'Could not find post on profile' };
+    return { verified: false, error: 'Most recent post caption does not match' };
   } finally {
     await context.close();
   }

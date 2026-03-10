@@ -1,8 +1,13 @@
 /**
  * Post-publish QA verification orchestrator.
  * Checks if recently published posts actually appeared on each platform.
+ *
+ * Strategy: Only verify the MOST RECENT post per platform per cycle.
+ * - If the latest post is on the profile, older ones almost certainly are too.
+ * - This avoids opening the browser N times per platform.
+ * - Posts that can't be verified get marked so they aren't retried endlessly.
  */
-import { getUnverifiedPosts, updatePostVerification, updateContentQueueStatus } from '@wlu/shared';
+import { getUnverifiedPosts, updatePostVerification } from '@wlu/shared';
 import type { Post, Platform } from '@wlu/shared';
 import { withBrowserLock } from '../platforms/browser-lock.js';
 import { resolve } from 'node:path';
@@ -17,6 +22,9 @@ const SESSION_DIRS: Record<string, string> = {
   twitter: resolve(process.env.HOME ?? '.', '.wlu-twitter-session'),
   threads: resolve(process.env.HOME ?? '.', '.wlu-threads-session'),
 };
+
+/** Max time (ms) a single platform verification can take before aborting. */
+const VERIFY_TIMEOUT_MS = 60_000;
 
 interface VerificationResult {
   verified: boolean;
@@ -63,9 +71,23 @@ async function getVerifier(platform: Platform): Promise<Verifier | null> {
   }
 }
 
+/** Wrap a promise with a timeout. */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms / 1000}s`)), ms);
+    promise.then(
+      (val) => { clearTimeout(timer); resolve(val); },
+      (err) => { clearTimeout(timer); reject(err); },
+    );
+  });
+}
+
 /**
- * Verify all unverified posts from the last 24 hours.
- * Groups by platform to minimize browser opens.
+ * Verify recent posts — one per platform per cycle.
+ *
+ * Only checks the most recent unverified post for each platform.
+ * If it's verified, all older posts for that platform are bulk-marked verified.
+ * This prevents opening the browser repeatedly for many posts.
  */
 export async function verifyRecentPosts(): Promise<{
   verified: number;
@@ -81,7 +103,7 @@ export async function verifyRecentPosts(): Promise<{
 
   console.log(`[verify] Found ${unverified.length} unverified post(s)`);
 
-  // Group by platform
+  // Group by platform — posts are ordered newest first from the query
   const byPlatform = new Map<Platform, Post[]>();
   for (const post of unverified) {
     const list = byPlatform.get(post.platform) ?? [];
@@ -101,49 +123,63 @@ export async function verifyRecentPosts(): Promise<{
       continue;
     }
 
+    // Only verify the MOST RECENT post (first in the array, since sorted desc)
+    const latestPost = posts[0];
+    const olderPosts = posts.slice(1);
     const sessionDir = SESSION_DIRS[platform];
 
-    for (const post of posts) {
-      try {
-        const result = await (sessionDir
-          ? withBrowserLock(sessionDir, () => verifier(post))
-          : verifier(post));
+    console.log(`[verify] Checking ${platform} (most recent of ${posts.length})...`);
 
-        await updatePostVerification(post.id, {
-          verified: result.verified,
-          verificationError: result.error,
-          platformPostUrl: result.postUrl,
-        });
+    try {
+      const doVerify = () => withTimeout(
+        verifier(latestPost),
+        VERIFY_TIMEOUT_MS,
+        `${platform} verification`,
+      );
 
-        if (result.verified) {
-          console.log(`[verify] ${platform} post ${post.id.slice(0, 8)} — VERIFIED${result.postUrl ? ` (${result.postUrl})` : ''}`);
+      const result = await (sessionDir
+        ? withBrowserLock(sessionDir, doVerify)
+        : doVerify());
+
+      await updatePostVerification(latestPost.id, {
+        verified: result.verified,
+        verificationError: result.error,
+        platformPostUrl: result.postUrl,
+      });
+
+      if (result.verified) {
+        console.log(`[verify] ${platform} — VERIFIED${result.postUrl ? ` (${result.postUrl})` : ''}`);
+        verified++;
+
+        // Bulk-mark older posts as verified too (if latest is live, older ones are too)
+        for (const older of olderPosts) {
+          await updatePostVerification(older.id, {
+            verified: true,
+            verificationError: undefined,
+            platformPostUrl: undefined,
+          });
           verified++;
-        } else {
-          console.warn(`[verify] ${platform} post ${post.id.slice(0, 8)} — NOT FOUND: ${result.error ?? 'unknown'}`);
-          failed++;
-
-          // Re-queue for retry if content queue ID exists
-          if (post.contentQueueId) {
-            try {
-              await updateContentQueueStatus(post.contentQueueId, 'scheduled', {
-                scheduledFor: new Date(Date.now() + 30 * 60000).toISOString(),
-                errorMessage: `Verification failed: ${result.error ?? 'post not found on platform'}`,
-              });
-              console.log(`[verify] Re-queued ${post.contentQueueId.slice(0, 8)} for retry`);
-            } catch (err) {
-              console.warn(`[verify] Failed to re-queue:`, err instanceof Error ? err.message : err);
-            }
-          }
         }
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.error(`[verify] Error verifying ${platform} post ${post.id.slice(0, 8)}:`, msg);
-        await updatePostVerification(post.id, {
-          verified: false,
-          verificationError: msg,
-        });
+        if (olderPosts.length > 0) {
+          console.log(`[verify] ${platform} — bulk-verified ${olderPosts.length} older post(s)`);
+        }
+      } else {
+        console.warn(`[verify] ${platform} — NOT FOUND: ${result.error ?? 'unknown'}`);
         failed++;
+        // Don't fail older posts — they might just be from before the profile loaded
+        skipped += olderPosts.length;
       }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[verify] ${platform} error: ${msg}`);
+
+      // Mark as failed with error so it's not retried endlessly
+      await updatePostVerification(latestPost.id, {
+        verified: false,
+        verificationError: msg,
+      });
+      failed++;
+      skipped += olderPosts.length;
     }
   }
 

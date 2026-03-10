@@ -151,6 +151,7 @@ export async function createApprovedMessage(input: CreateMessageInput): Promise<
       content: input.content,
       email: input.email || null,
       approved: true,
+      seeded: input.seeded ?? false,
     })
     .select()
     .single();

@@ -25,6 +25,9 @@ export async function browserPublishPinterest(options: {
   mood?: string;
   isExploration?: boolean;
   dryRun?: boolean;
+  messageContent?: string;
+  messageTo?: string;
+  messageFrom?: string;
 }): Promise<PinterestPublishResult> {
   const todayCount = await getPostCountToday('pinterest');
   if (todayCount >= MAX_POSTS_PER_DAY) {
@@ -50,10 +53,16 @@ export async function browserPublishPinterest(options: {
     ? `https://wordsleftunsent.com/messages/${messageId}`
     : 'https://wordsleftunsent.com';
 
+  // Build pin description from message content (not IG caption)
+  const quote = options.messageContent ?? options.caption.split('\n')[0];
+  const header = options.messageTo ? `To ${options.messageTo},\n\n` : '';
+  const attribution = options.messageFrom ? `\n\n— ${options.messageFrom}` : '';
+  const pinDescription = `${header}"${quote}"${attribution}\n\nRead more at wordsleftunsent.com`;
+
   if (options.dryRun) {
     console.log('[pinterest-publish] [DRY RUN] Would create pin:');
     console.log(`  Image: ${imagePath}`);
-    console.log(`  Caption: "${options.caption.slice(0, 100)}..."`);
+    console.log(`  Description: "${pinDescription.slice(0, 100)}..."`);
     console.log(`  Link: ${pinUrl}`);
     return { postId: 'dry-run', platformPostId: null };
   }
@@ -63,7 +72,7 @@ export async function browserPublishPinterest(options: {
 
   try {
     console.log('[pinterest-publish] Creating pin...');
-    await createPin(page, imagePath, options.caption, pinUrl);
+    await createPin(page, imagePath, pinDescription, pinUrl);
 
     console.log('[pinterest-publish] Pin created successfully!');
 
@@ -175,7 +184,7 @@ async function createPin(
           await page.waitForTimeout(500);
           const createBtn = page.getByRole('button', { name: /^Create$/i }).first();
           if (await createBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-            await createBtn.click();
+            await createBtn.click({ force: true });
             await page.waitForTimeout(2000);
             console.log('[pinterest-publish] Created new board: Unsent Letters');
           }
@@ -200,7 +209,7 @@ async function createPin(
   // Click Publish
   console.log('[pinterest-publish] Clicking Publish...');
   const publishBtn = page.getByRole('button', { name: /^Publish$/i }).first();
-  await publishBtn.click({ timeout: 10000 });
+  await publishBtn.click({ timeout: 10000, force: true });
 
   await page.waitForTimeout(5000);
   await page.screenshot({ path: '/tmp/pinterest-post-result.png' }).catch(() => {});

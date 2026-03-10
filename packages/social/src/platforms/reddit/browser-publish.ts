@@ -34,6 +34,8 @@ export async function browserPublishReddit(options: {
   messageContent?: string;
   /** The "To" field from the message. */
   messageTo?: string;
+  /** The "From" field from the message. */
+  messageFrom?: string;
 }): Promise<RedditPublishResult> {
   const todayCount = await getPostCountToday('reddit');
   if (todayCount >= MAX_POSTS_PER_DAY) {
@@ -46,13 +48,14 @@ export async function browserPublishReddit(options: {
   const dayOfMonth = new Date().getDate();
   const subreddit = TARGET_SUBREDDITS[dayOfMonth % TARGET_SUBREDDITS.length];
 
-  // Use message content if provided, otherwise extract from caption
+  // Use original message content — fall back to caption only as last resort
   const title = options.messageTo
     ? `To ${options.messageTo}`
-    : 'Words left unsaid';
+    : 'Words left unsent';
 
-  const body = options.messageContent ?? options.caption;
-  const footer = '\n\n---\n*Read more anonymous messages at [wordsleftunsent.com](https://wordsleftunsent.com)*';
+  const body = options.messageContent ?? options.caption.split('\n')[0];
+  const attribution = options.messageFrom ? `\n\n— *${options.messageFrom}*` : '';
+  const footer = `${attribution}\n\n---\n*Read more anonymous messages at [wordsleftunsent.com](https://wordsleftunsent.com)*`;
 
   if (options.dryRun) {
     console.log('[reddit-publish] [DRY RUN] Would post to r/' + subreddit);

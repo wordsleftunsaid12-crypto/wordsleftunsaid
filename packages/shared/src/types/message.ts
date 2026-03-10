@@ -7,6 +7,7 @@ export interface Message {
   approved: boolean;
   created_at: string;
   like_count: number;
+  seeded: boolean;
 }
 
 export interface CreateMessageInput {
@@ -14,6 +15,7 @@ export interface CreateMessageInput {
   to: string;
   content: string;
   email?: string;
+  seeded?: boolean;
 }
 
 export interface MessageFilters {

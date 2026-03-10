@@ -77,6 +77,7 @@ async function ensureUnusedMessages(needed: number): Promise<number> {
         from: template.from,
         to: template.to,
         content: template.content,
+        seeded: true,
       });
       seeded++;
     } catch (err) {

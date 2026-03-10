@@ -623,6 +623,7 @@ export async function seedDailyMessages(
         from: template.from,
         to: template.to,
         content: template.content,
+        seeded: true,
       });
       seeded++;
       console.log(`[seed-messages] Seeded message ${msg.id}: "${template.content.slice(0, 50)}..."`);

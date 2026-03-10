@@ -22,6 +22,9 @@ export async function browserPublishTwitter(options: {
   mood?: string;
   isExploration?: boolean;
   dryRun?: boolean;
+  messageContent?: string;
+  messageTo?: string;
+  messageFrom?: string;
 }): Promise<TwitterPublishResult> {
   const todayCount = await getPostCountToday('twitter');
   if (todayCount >= MAX_POSTS_PER_DAY) {
@@ -30,15 +33,18 @@ export async function browserPublishTwitter(options: {
     );
   }
 
-  // Build tweet text — short quote + link
+  // Build tweet text — message quote + link
   const messageId = options.messageIds?.[0];
   const link = messageId
     ? `https://wordsleftunsent.com/messages/${messageId}`
     : 'https://wordsleftunsent.com';
 
-  // Extract a short quote from the caption (first line, truncated)
-  const firstLine = options.caption.split('\n')[0].slice(0, 200);
-  const tweetText = `${firstLine}\n\n${link}`;
+  // Use original message content, fall back to caption first line
+  const quote = options.messageContent
+    ? `"${options.messageContent.slice(0, 200)}"`
+    : options.caption.split('\n')[0].slice(0, 200);
+  const attribution = options.messageFrom ? `\n— ${options.messageFrom}` : '';
+  const tweetText = `${quote}${attribution}\n\n${link}`;
 
   if (options.dryRun) {
     console.log('[twitter-publish] [DRY RUN] Would tweet:');

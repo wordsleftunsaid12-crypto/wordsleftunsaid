@@ -4,7 +4,9 @@ import {
   createContentQueueItem,
   hasPostForMessages,
   hasQueueItemForMessages,
+  getMessageById,
 } from '@wlu/shared';
+import type { Message } from '@wlu/shared';
 import { browserPublishReel } from '../platforms/instagram/browser-publish.js';
 
 /** Platforms to auto-cross-post to after a successful publish. */
@@ -55,6 +57,12 @@ export async function publishNextScheduled(
   }
 
   try {
+    // Fetch original message for text-based platforms (Reddit, Twitter, Threads, Pinterest)
+    let sourceMessage: Message | null = null;
+    if (item.messageIds?.length) {
+      sourceMessage = await getMessageById(item.messageIds[0]);
+    }
+
     // For TikTok, ensure posts always have discovery hashtags
     let hashtagString = (item.hashtags ?? []).join(' ');
     if (platform === 'tiktok' && !hashtagString) {
@@ -71,6 +79,10 @@ export async function publishNextScheduled(
       template: item.template,
       mood: item.mood ?? undefined,
       isExploration: item.isExploration,
+      // Original message fields for text-based platforms
+      messageContent: sourceMessage?.content,
+      messageTo: sourceMessage?.to,
+      messageFrom: sourceMessage?.from,
     };
 
     let result: { postId: string; platformPostId: string | null };

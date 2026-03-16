@@ -64,7 +64,10 @@ export async function createContentQueueItem(
       dupeQuery = dupeQuery.eq('platform', input.platform);
     }
 
-    const { data: existing } = await dupeQuery;
+    const { data: existing, error: dupeError } = await dupeQuery;
+    if (dupeError) {
+      console.warn('Failed to check for duplicate queue items:', dupeError.message);
+    }
 
     const inputKey = JSON.stringify([...input.messageIds].sort());
     const dupe = (existing ?? []).find((row) => {

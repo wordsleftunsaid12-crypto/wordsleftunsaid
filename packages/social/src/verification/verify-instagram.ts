@@ -1,15 +1,18 @@
 import type { Post } from '@wlu/shared';
 import { launchInstagram, navigateToProfile } from '../platforms/instagram/browser.js';
-import { extractSnippet, textContains } from './match-utils.js';
 
 interface VerificationResult {
   verified: boolean;
+  platformCount: number;
   postUrl?: string;
   error?: string;
+  screenshotPath?: string;
 }
 
 /**
- * Verify an Instagram post exists by checking the profile's most recent post.
+ * Verify Instagram posts by counting videos/reels on the profile.
+ * Navigates to our profile, reads the post count from the stats header,
+ * and takes a screenshot as evidence.
  */
 export async function verifyInstagramPost(post: Post): Promise<VerificationResult> {
   const { context, page } = await launchInstagram();
@@ -18,33 +21,50 @@ export async function verifyInstagramPost(post: Post): Promise<VerificationResul
     await navigateToProfile(page, 'u.wordsleftunsent');
     await page.waitForTimeout(5000);
 
-    // Wait for profile to render — try multiple selectors for the profile header
-    const profileHeader = page.locator('header, [data-testid="user-profile"], main').first();
-    const profileLoaded = await profileHeader.isVisible({ timeout: 10000 }).catch(() => false);
-    if (!profileLoaded) {
-      console.log(`[verify-ig] Profile did not load. URL: ${page.url()}`);
-      return { verified: false, error: 'Instagram profile did not load' };
+    // Take screenshot of profile
+    const screenshotPath = '/tmp/verify-instagram-profile.png';
+    await page.screenshot({ path: screenshotPath }).catch(() => {});
+
+    // Read post count from profile header stats
+    // Instagram shows "X posts" in the header — the number is in a span near the text "posts"
+    const profileText = await page.textContent('header').catch(() => '') ?? '';
+
+    // Try to parse "X posts" from the header text
+    const postCountMatch = profileText.match(/(\d[\d,]*)\s*posts?/i);
+    if (postCountMatch) {
+      const count = parseInt(postCountMatch[1].replace(/,/g, ''), 10);
+      console.log(`[verify-ig] Profile shows ${count} posts`);
+      return { verified: true, platformCount: count, screenshotPath };
     }
 
-    // Wait for post grid to render — look for any post link (reel or image)
-    const firstPost = page.locator('a[href*="/p/"], a[href*="/reel/"]').first();
-    const hasPost = await firstPost.isVisible({ timeout: 10000 }).catch(() => false);
-    if (!hasPost) {
-      // Broader fallback: look for any image/video thumbnail in the grid
-      const anyThumb = page.locator('article img, div[role="tablist"] ~ div img').first();
-      if (!(await anyThumb.isVisible({ timeout: 3000 }).catch(() => false))) {
-        return { verified: false, error: 'No posts visible on profile' };
+    // Fallback: try to find post count using the stats area (span/a elements)
+    // Instagram renders stats as: posts / followers / following
+    const statLinks = page.locator('header li, header a[href*="/"]');
+    const statCount = await statLinks.count();
+    for (let i = 0; i < Math.min(statCount, 5); i++) {
+      const text = await statLinks.nth(i).textContent().catch(() => '') ?? '';
+      const match = text.match(/(\d[\d,]*)\s*posts?/i);
+      if (match) {
+        const count = parseInt(match[1].replace(/,/g, ''), 10);
+        console.log(`[verify-ig] Profile shows ${count} posts (from stats)`);
+        return { verified: true, platformCount: count, screenshotPath };
       }
-      // Posts exist but links aren't the expected format — consider verified if we can see content
-      return { verified: true };
     }
 
-    const href = await firstPost.getAttribute('href').catch(() => null);
-    const postUrl = href ? `https://www.instagram.com${href}` : undefined;
+    // Last fallback: count actual post thumbnails in the grid
+    const postLinks = page.locator('a[href*="/p/"], a[href*="/reel/"]');
+    const gridCount = await postLinks.count();
+    if (gridCount > 0) {
+      console.log(`[verify-ig] Found ${gridCount} post links in grid (stats not parseable)`);
+      return { verified: true, platformCount: gridCount, screenshotPath };
+    }
 
-    // If we found posts on the profile, that's enough for verification
-    // Caption matching is fragile on IG (short captions, emoji, etc.)
-    return { verified: true, postUrl };
+    return {
+      verified: false,
+      platformCount: 0,
+      error: 'Could not read post count from Instagram profile',
+      screenshotPath,
+    };
   } finally {
     await context.close();
   }

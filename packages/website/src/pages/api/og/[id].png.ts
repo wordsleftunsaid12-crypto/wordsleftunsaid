@@ -9,19 +9,23 @@ export const GET: APIRoute = async ({ params }) => {
     return new Response('Not found', { status: 404 });
   }
 
-  const message = await getMessageById(id);
-  if (!message || !message.approved) {
-    return new Response('Not found', { status: 404 });
+  try {
+    const message = await getMessageById(id);
+    if (!message || !message.approved) {
+      return new Response('Not found', { status: 404 });
+    }
+
+    const svg = buildOgSvg(message.to, message.from, message.content);
+    const png = await sharp(Buffer.from(svg)).png().toBuffer();
+
+    return new Response(png, {
+      status: 200,
+      headers: {
+        'Content-Type': 'image/png',
+        'Cache-Control': 'public, max-age=86400, s-maxage=604800',
+      },
+    });
+  } catch {
+    return new Response('Failed to generate image', { status: 500 });
   }
-
-  const svg = buildOgSvg(message.to, message.from, message.content);
-  const png = await sharp(Buffer.from(svg)).png().toBuffer();
-
-  return new Response(png, {
-    status: 200,
-    headers: {
-      'Content-Type': 'image/png',
-      'Cache-Control': 'public, max-age=86400, s-maxage=604800',
-    },
-  });
 };

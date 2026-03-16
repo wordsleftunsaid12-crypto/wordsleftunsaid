@@ -1,8 +1,12 @@
 import { bundle } from '@remotion/bundler';
 import { renderMedia, renderStill, selectComposition } from '@remotion/renderer';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+
+const execFileAsync = promisify(execFile);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -31,23 +35,29 @@ export function isCinematic(compositionId: CompositionId): boolean {
 
 /** Cached bundle URL — avoids re-bundling for every video in a batch */
 let cachedBundleUrl: string | null = null;
+/** In-flight bundling promise — serializes concurrent calls */
+let bundlingPromise: Promise<string> | null = null;
 
 /**
  * Bundle the Remotion project once. Reuses the cached bundle for subsequent calls.
+ * Serializes concurrent calls so only one bundling operation runs at a time.
  */
 export async function ensureBundle(): Promise<string> {
   if (cachedBundleUrl) return cachedBundleUrl;
+  if (bundlingPromise) return bundlingPromise;
 
   const entryPoint = path.resolve(__dirname, '../compositions/Root.tsx');
 
   console.log('Bundling Remotion project (one-time)...');
-  cachedBundleUrl = await bundle({
+  bundlingPromise = bundle({
     entryPoint,
     onProgress: (progress) => {
       if (progress % 25 === 0) console.log(`  Bundle progress: ${progress}%`);
     },
   });
 
+  cachedBundleUrl = await bundlingPromise;
+  bundlingPromise = null;
   return cachedBundleUrl;
 }
 
@@ -93,8 +103,36 @@ export async function renderVideo(options: RenderOptions): Promise<string> {
 }
 
 /**
- * Render a single frame as a PNG cover image (for thumbnails).
- * Frame 0 contains the hook text, making it an effective scroll-stopping thumbnail.
+ * Extract a cover frame directly from a rendered MP4 using FFmpeg.
+ * This guarantees the cover matches the video pixel-for-pixel (no separate
+ * Remotion render that could have different Video component seeking behavior).
+ */
+export async function extractCoverFromVideo(
+  videoPath: string,
+  outputPath: string,
+  frame = 0,
+): Promise<string> {
+  const fps = 30;
+  const timestamp = frame / fps;
+
+  console.log(`Extracting cover frame ${frame} from rendered video...`);
+  await execFileAsync('ffmpeg', [
+    '-y',
+    '-ss', String(timestamp),
+    '-i', videoPath,
+    '-vframes', '1',
+    '-q:v', '1',
+    outputPath,
+  ]);
+
+  console.log(`Cover frame saved to: ${outputPath}`);
+  return outputPath;
+}
+
+/**
+ * Render a single frame as a PNG cover image via Remotion.
+ * Used as fallback when the video hasn't been rendered yet (e.g., QA frame extraction).
+ * Prefer extractCoverFromVideo() for production covers.
  */
 export async function renderCoverFrame(options: {
   compositionId: CompositionId;

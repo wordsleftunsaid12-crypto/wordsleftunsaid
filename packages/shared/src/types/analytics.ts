@@ -1,3 +1,5 @@
+import type { Platform } from './social.js';
+
 export interface EngagementMetric {
   id: string;
   postId: string;
@@ -43,7 +45,7 @@ export interface StrategyBrief {
 
 export interface FollowerSnapshot {
   id: string;
-  platform: string;
+  platform: Platform;
   followerCount: number;
   followingCount: number;
   measuredAt: string;

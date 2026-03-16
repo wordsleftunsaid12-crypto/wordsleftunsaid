@@ -8,6 +8,8 @@ import {
   getFollowerHistory,
   getTodayPosts,
   getRecentPosts,
+  getOutboundEngagementCountToday,
+  getContentQueue,
 } from '@wlu/shared';
 import type { Platform } from '@wlu/shared';
 import { getWebsiteMetrics, getYesterdayMetrics } from './ga4.js';
@@ -108,8 +110,9 @@ function changeStr(change: number): string {
  */
 export async function generateDailySummary(): Promise<void> {
   const today = new Date();
-  const dateStr = today.toISOString().split('T')[0];
+  const dateStr = today.toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
   const displayDate = today.toLocaleDateString('en-US', {
+    timeZone: 'America/Los_Angeles',
     weekday: 'long',
     month: 'long',
     day: 'numeric',
@@ -190,6 +193,32 @@ export async function generateDailySummary(): Promise<void> {
   console.log('  VERIFICATION');
   console.log('  ' + '\u2500'.repeat(40));
   console.log(`  Verified: ${verified}/${recentPosts.length}    Failed: ${verifiedFalse}${failedPlatforms.length > 0 ? ` (${failedPlatforms.join(', ')})` : ''}    Pending: ${unchecked}`);
+
+  // --- Outbound Engagement ---
+  const likes = await getOutboundEngagementCountToday('like');
+  const follows = await getOutboundEngagementCountToday('follow');
+  const comments = await getOutboundEngagementCountToday('comment');
+
+  console.log('');
+  console.log('  OUTBOUND ENGAGEMENT');
+  console.log('  ' + '\u2500'.repeat(40));
+  console.log(`  Likes:      ${likes}`);
+  console.log(`  Follows:    ${follows}`);
+  console.log(`  Comments:   ${comments}`);
+
+  // --- Content Queue ---
+  const scheduled = await getContentQueue({ status: 'scheduled', limit: 100 });
+  const captioned = await getContentQueue({ status: 'captioned', limit: 100 });
+  const pending = await getContentQueue({ status: 'pending', limit: 100 });
+  const qaPassed = await getContentQueue({ status: 'qa_passed', limit: 100 });
+
+  console.log('');
+  console.log('  CONTENT QUEUE');
+  console.log('  ' + '\u2500'.repeat(40));
+  console.log(`  Scheduled:  ${scheduled.length}`);
+  console.log(`  Captioned:  ${captioned.length}`);
+  console.log(`  QA passed:  ${qaPassed.length}`);
+  console.log(`  Pending:    ${pending.length}`);
 
   // --- Trends ---
   console.log('');

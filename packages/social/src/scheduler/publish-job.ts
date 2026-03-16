@@ -6,7 +6,7 @@ import {
   hasQueueItemForMessages,
   getMessageById,
 } from '@wlu/shared';
-import type { Message } from '@wlu/shared';
+import type { Message, Platform } from '@wlu/shared';
 import { browserPublishReel } from '../platforms/instagram/browser-publish.js';
 import { buildUtmUrl } from '../utils/utm.js';
 
@@ -39,14 +39,13 @@ const TIKTOK_DEFAULT_HASHTAGS = [
  * Check for the next scheduled item and publish it if due.
  */
 export async function publishNextScheduled(
-  options: { platform?: 'instagram' | 'tiktok' | 'youtube' | 'reddit' | 'pinterest' | 'twitter' | 'threads'; dryRun?: boolean } = {},
+  options: { platform?: Platform; dryRun?: boolean } = {},
 ): Promise<boolean> {
   const { platform = 'instagram', dryRun = false } = options;
 
   const item = await getNextScheduledItem(platform);
 
   if (!item) {
-    console.log('[publish-job] No items due for publishing');
     return false;
   }
 

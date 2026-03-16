@@ -23,4 +23,5 @@ packages/social/src/**/*.d.ts
 packages/social/src/**/*.d.ts.map
 packages/social/src/**/*.js
 packages/social/src/**/*.js.map
+*.tsbuildinfo
 supabase/.temp/

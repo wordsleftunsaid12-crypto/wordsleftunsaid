@@ -2,7 +2,7 @@ import type { Page } from 'playwright';
 import { createPost, getPostCountToday, updateContentQueueStatus } from '@wlu/shared';
 import { launchReddit } from './browser.js';
 
-const MAX_POSTS_PER_DAY = 1; // Reddit is strict — keep volume very low
+const MAX_POSTS_PER_DAY = 3;
 
 interface RedditPublishResult {
   postId: string;
@@ -46,9 +46,9 @@ export async function browserPublishReddit(options: {
     );
   }
 
-  // Pick subreddit (rotate by day of month)
+  // Pick subreddit: rotate by (day + todayCount) so each post goes to a different sub
   const dayOfMonth = new Date().getDate();
-  const subreddit = TARGET_SUBREDDITS[dayOfMonth % TARGET_SUBREDDITS.length];
+  const subreddit = TARGET_SUBREDDITS[(dayOfMonth + todayCount) % TARGET_SUBREDDITS.length];
 
   // Use original message content — fall back to caption only as last resort
   const title = options.messageTo
@@ -165,11 +165,11 @@ async function submitTextPost(
       console.log('[reddit-publish] Flair selected');
     }
 
-    // Click "Add" to confirm
+    // Click "Add" to confirm — force:true to bypass devvit-wrapper overlay
     await page.waitForTimeout(500);
     const addBtn = page.getByRole('button', { name: /^Add$/i }).first();
     if (await addBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await addBtn.click();
+      await addBtn.click({ force: true });
       await page.waitForTimeout(1000);
     }
   }
@@ -179,10 +179,11 @@ async function submitTextPost(
 
   // Click submit/post
   console.log('[reddit-publish] Clicking Post...');
-  const postBtn = page
-    .getByRole('button', { name: /^Post$/i })
-    .or(page.locator('button[type="submit"]').filter({ hasText: /post/i }))
-    .first();
+  const roleBtn = page.getByRole('button', { name: /^Post$/i }).first();
+  const submitBtn = page.locator('button[type="submit"]').filter({ hasText: /post/i }).first();
+  const postBtn = (await roleBtn.isVisible({ timeout: 5000 }).catch(() => false))
+    ? roleBtn
+    : submitBtn;
   await postBtn.click({ timeout: 10000, force: true });
 
   // Wait for navigation to the new post

@@ -200,27 +200,47 @@ async function uploadShort(
  * If we publish before this completes, the video can end up in Drafts.
  */
 async function waitForHdProcessing(page: Page): Promise<void> {
-  const maxWaitMs = 300000; // 5 minutes
+  const maxWaitMs = 600000; // 10 minutes
   const pollInterval = 5000;
+
+  // Wait a few seconds for the processing indicator to render before polling.
+  // Without this, the check can return false immediately (no text yet) and
+  // we'd incorrectly conclude processing is already done.
+  await page.waitForTimeout(5000);
+
   const startTime = Date.now();
+  let sawProcessing = false;
 
   while (Date.now() - startTime < maxWaitMs) {
-    const processingText = page.locator('text=/Processing.*minutes? left/i').first();
-    const isProcessing = await processingText.isVisible({ timeout: 1000 }).catch(() => false);
+    const processingText = page.locator('text=/Processing|Uploading|Checking/i').first();
+    const isProcessing = await processingText.isVisible({ timeout: 2000 }).catch(() => false);
 
-    if (!isProcessing) {
+    if (isProcessing) {
+      sawProcessing = true;
+      const elapsed = Math.round((Date.now() - startTime) / 1000);
+      const text = await processingText.textContent().catch(() => 'still processing');
+      console.log(`[youtube-publish] HD: ${text} (${elapsed}s)`);
+    } else if (sawProcessing) {
+      // Processing text was visible before but now it's gone — done
       console.log('[youtube-publish] HD processing complete');
       return;
+    } else {
+      // Never saw processing text — check if the done-button is already enabled
+      const doneBtn = page.locator('#done-button').first();
+      const isEnabled = await doneBtn.isEnabled({ timeout: 1000 }).catch(() => false);
+      if (isEnabled) {
+        console.log('[youtube-publish] HD processing complete (button ready)');
+        return;
+      }
     }
-
-    const elapsed = Math.round((Date.now() - startTime) / 1000);
-    const text = await processingText.textContent().catch(() => 'still processing');
-    console.log(`[youtube-publish] HD: ${text} (${elapsed}s)`)
 
     await page.waitForTimeout(pollInterval);
   }
 
-  console.warn('[youtube-publish] HD processing did not complete within 5 min, publishing anyway');
+  await page.screenshot({ path: '/tmp/youtube-hd-timeout.png' }).catch(() => {});
+  throw new Error(
+    'YouTube HD processing did not complete within 10 minutes. Screenshot: /tmp/youtube-hd-timeout.png',
+  );
 }
 
 /**
@@ -270,6 +290,7 @@ async function clickNext(page: Page): Promise<void> {
  * Wait for YouTube to confirm the upload is complete.
  */
 async function waitForConfirmation(page: Page): Promise<void> {
+  // Wait for confirmation — this MUST succeed for the post to be recorded
   try {
     // YouTube shows "Video published" or a link to the video
     await page
@@ -281,9 +302,11 @@ async function waitForConfirmation(page: Page): Promise<void> {
 
     console.log('[youtube-publish] Confirmed: Video published!');
   } catch {
-    console.warn('[youtube-publish] No explicit confirmation text, waiting 15s...');
-    await page.waitForTimeout(15000);
+    // No confirmation — take a screenshot and FAIL so we don't record a ghost post
     await page.screenshot({ path: '/tmp/youtube-post-result.png' }).catch(() => {});
+    throw new Error(
+      'YouTube publish failed: no confirmation text appeared after 2 minutes. Screenshot: /tmp/youtube-post-result.png',
+    );
   }
 
   // Close the upload dialog if there's a close button

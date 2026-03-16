@@ -1,13 +1,15 @@
 import 'dotenv/config';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
-import { renderVideo, renderCoverFrame, isCinematic, ensureBundle, copyToBundle } from './pipeline/render.js';
+import { renderVideo, extractCoverFromVideo, isCinematic, ensureBundle, copyToBundle } from './pipeline/render.js';
 import type { CompositionId } from './pipeline/render.js';
 import { detectMood } from './pipeline/mood.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const OUTPUT_DIR = path.resolve(__dirname, '../output');
 const PUBLIC_DIR = path.resolve(__dirname, '../public');
+const PROCESSED_DIR = path.resolve(__dirname, '../output/processed');
 
 const command = process.argv[2];
 
@@ -17,19 +19,35 @@ async function prepareBgVideo(
 ): Promise<string> {
   const { prepareBackgroundVideo } = await import('./pipeline/video-assets.js');
   const { VIDEO_PRESETS } = await import('@wlu/shared');
-  const { mkdirSync, copyFileSync } = await import('fs');
 
   const isVertical = template.includes('Vertical');
   const preset = isVertical ? VIDEO_PRESETS['9:16'] : VIDEO_PRESETS['1:1'];
   const processedPath = await prepareBackgroundVideo(mood, preset.width, preset.height);
 
-  mkdirSync(PUBLIC_DIR, { recursive: true });
+  fs.mkdirSync(PUBLIC_DIR, { recursive: true });
   const bgFilename = path.basename(processedPath);
-  copyFileSync(processedPath, path.join(PUBLIC_DIR, bgFilename));
+  fs.copyFileSync(processedPath, path.join(PUBLIC_DIR, bgFilename));
   // Also copy into cached Remotion bundle so it's served for subsequent renders
   copyToBundle(processedPath, bgFilename);
 
   return bgFilename;
+}
+
+/**
+ * Clean up processed background video after render completes.
+ * Removes copies from public/ and output/processed/ to prevent disk accumulation.
+ */
+function cleanupBgVideo(bgFilename: string): void {
+  const publicCopy = path.join(PUBLIC_DIR, bgFilename);
+  const processedCopy = path.join(PROCESSED_DIR, bgFilename);
+  for (const filePath of [publicCopy, processedCopy]) {
+    try {
+      fs.unlinkSync(filePath);
+    } catch {
+      // File may already be removed or not exist
+    }
+  }
+  console.log(`  Cleaned up background: ${bgFilename}`);
 }
 
 async function main() {
@@ -68,13 +86,11 @@ async function main() {
         outputPath,
       });
 
-      // Generate cover frame (frame 0 has hook text for thumbnail)
+      // Extract cover frame from the rendered video (guaranteed to match)
       const coverPath = outputPath.replace('.mp4', '-cover.png');
-      await renderCoverFrame({
-        compositionId: template,
-        props: { from, to, content, backgroundVideo },
-        outputPath: coverPath,
-      });
+      await extractCoverFromVideo(outputPath, coverPath);
+
+      if (backgroundVideo) cleanupBgVideo(backgroundVideo);
 
       console.log('\nDone!');
       break;
@@ -103,6 +119,8 @@ async function main() {
         break;
       }
 
+      let successCount = 0;
+      let failCount = 0;
       for (const s of result.selected) {
         const timestamp = Date.now();
         const outputPath = path.join(OUTPUT_DIR, `${template}-${timestamp}.mp4`);
@@ -111,28 +129,41 @@ async function main() {
 
         let backgroundVideo: string | undefined;
 
-        if (isCinematic(template)) {
-          console.log(`  Preparing background video (mood: ${s.mood})...`);
-          await ensureBundle();
-          backgroundVideo = await prepareBgVideo(
-            s.mood as 'tender' | 'regretful' | 'hopeful' | 'bittersweet' | 'raw',
-            template,
-          );
-        }
+        try {
+          if (isCinematic(template)) {
+            console.log(`  Preparing background video (mood: ${s.mood})...`);
+            await ensureBundle();
+            backgroundVideo = await prepareBgVideo(
+              s.mood as 'tender' | 'regretful' | 'hopeful' | 'bittersweet' | 'raw',
+              template,
+            );
+          }
 
-        await renderVideo({
-          compositionId: template,
-          props: {
-            from: s.message.from,
-            to: s.message.to,
-            content: s.message.content,
-            backgroundVideo,
-          },
-          outputPath,
-        });
+          await renderVideo({
+            compositionId: template,
+            props: {
+              from: s.message.from,
+              to: s.message.to,
+              content: s.message.content,
+              backgroundVideo,
+            },
+            outputPath,
+          });
+
+          const coverPath = outputPath.replace('.mp4', '-cover.png');
+          await extractCoverFromVideo(outputPath, coverPath);
+
+          if (backgroundVideo) cleanupBgVideo(backgroundVideo);
+          successCount++;
+        } catch (err) {
+          failCount++;
+          const msg = err instanceof Error ? err.message : String(err);
+          console.error(`  Failed to render: ${msg.slice(0, 200)}`);
+          if (backgroundVideo) cleanupBgVideo(backgroundVideo);
+        }
       }
 
-      console.log(`\nBatch complete! Rendered ${result.selected.length} videos.`);
+      console.log(`\nBatch complete! ${successCount} rendered, ${failCount} failed.`);
       break;
     }
 
@@ -157,9 +188,18 @@ async function main() {
         break;
       }
 
-      // Prefer messages under 150 chars for best video readability
-      const shortMessages = unused.filter((m) => m.content.length <= 150);
-      const candidates = shortMessages.length > 0 ? shortMessages : unused;
+      // Hard filter — never render messages that won't fit on screen
+      const { MAX_VIDEO_CONTENT_LENGTH } = await import('@wlu/shared');
+      const candidates = unused.filter((m) => m.content.length <= MAX_VIDEO_CONTENT_LENGTH);
+      const skippedCount = unused.length - candidates.length;
+      if (skippedCount > 0) {
+        console.log(`Skipped ${skippedCount} message(s) exceeding ${MAX_VIDEO_CONTENT_LENGTH} chars`);
+      }
+
+      if (candidates.length === 0) {
+        console.log('No unused messages short enough for video. Seed more or add shorter messages.');
+        break;
+      }
 
       // Shuffle and pick up to `count`
       const shuffled = candidates.sort(() => Math.random() - 0.5);
@@ -190,13 +230,11 @@ async function main() {
           outputPath,
         });
 
-        // Generate cover frame
+        // Extract cover frame from the rendered video (guaranteed to match)
         const coverPath = outputPath.replace('.mp4', '-cover.png');
-        await renderCoverFrame({
-          compositionId: template,
-          props: renderProps,
-          outputPath: coverPath,
-        });
+        await extractCoverFromVideo(outputPath, coverPath);
+
+        if (backgroundVideo) cleanupBgVideo(backgroundVideo);
 
         // Record the message ID in the content queue so it won't be picked again
         const { createContentQueueItem } = await import('@wlu/shared');
@@ -276,13 +314,11 @@ async function main() {
           outputPath: newOutputPath,
         });
 
-        // Generate cover frame
+        // Extract cover frame from the rendered video (guaranteed to match)
         const newCoverPath = newOutputPath.replace('.mp4', '-cover.png');
-        await renderCoverFrame({
-          compositionId: template,
-          props: renderProps,
-          outputPath: newCoverPath,
-        });
+        await extractCoverFromVideo(newOutputPath, newCoverPath);
+
+        if (backgroundVideo) cleanupBgVideo(backgroundVideo);
 
         // Update the queue item with new video + cover path, preserve original status
         await updateContentQueueStatus(item.id, rerenderStatus, { videoPath: newOutputPath, coverImagePath: newCoverPath });

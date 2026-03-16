@@ -9,6 +9,7 @@ import { collectFollowerSnapshot } from '../collectors/followers.js';
 import { seedDailyMessages } from '../content/message-seeder.js';
 import { saveLastRun, getSecondsSinceLastRun, installTimestampLogger } from './state.js';
 import { withBrowserLock } from '../platforms/browser-lock.js';
+import { getContentQueue } from '@wlu/shared';
 
 /** All supported platforms for publishing. */
 const ALL_PLATFORMS = [
@@ -38,24 +39,66 @@ interface SchedulerOptions {
 }
 
 /**
+ * Print a compact overview of upcoming scheduled posts.
+ */
+async function printUpcomingSchedule(): Promise<void> {
+  const items = await getContentQueue({ status: 'scheduled', limit: 50 });
+  if (items.length === 0) {
+    console.log('[schedule] No upcoming posts scheduled');
+    return;
+  }
+
+  // Sort by scheduled time ascending
+  const sorted = items
+    .filter((i) => i.scheduledFor)
+    .sort((a, b) => new Date(a.scheduledFor!).getTime() - new Date(b.scheduledFor!).getTime());
+
+  console.log(`[schedule] Upcoming posts (${sorted.length}):`);
+  for (const item of sorted) {
+    const time = new Date(item.scheduledFor!);
+    const timeStr = time.toLocaleTimeString('en-US', {
+      timeZone: 'America/Los_Angeles',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+    const dateStr = time.toLocaleDateString('en-US', {
+      timeZone: 'America/Los_Angeles',
+      month: 'short',
+      day: 'numeric',
+    });
+    const platform = (item.platform ?? 'unknown').padEnd(10);
+    const caption = (item.caption ?? '').slice(0, 40).replace(/\n/g, ' ');
+    console.log(`  ${dateStr} ${timeStr.padStart(8)}  ${platform}  ${caption}${(item.caption?.length ?? 0) > 40 ? '...' : ''}`);
+  }
+}
+
+/**
  * Publish across all platforms (or a single one if specified).
  * Iterates through each platform and publishes the next due item.
  */
 async function publishAllPlatforms(options: { dryRun?: boolean; platform?: Platform }): Promise<void> {
   const platforms = options.platform ? [options.platform] : [...ALL_PLATFORMS];
+  let published = false;
   for (const p of platforms) {
     const sessionDir = SESSION_DIRS[p];
     try {
+      let result: boolean;
       if (sessionDir) {
-        await withBrowserLock(sessionDir, () =>
+        result = await withBrowserLock(sessionDir, () =>
           publishNextScheduled({ platform: p, dryRun: options.dryRun }),
         );
       } else {
-        await publishNextScheduled({ platform: p, dryRun: options.dryRun });
+        result = await publishNextScheduled({ platform: p, dryRun: options.dryRun });
       }
+      if (result) published = true;
     } catch (err) {
       console.error(`[scheduler] publish ${p} failed:`, err instanceof Error ? err.message : err);
     }
+  }
+  // After a publish, show updated schedule
+  if (published) {
+    await printUpcomingSchedule();
   }
 }
 
@@ -129,9 +172,10 @@ export async function startScheduler(options: SchedulerOptions = {}): Promise<vo
   console.log(`[scheduler] Platforms: ${platform ?? 'ALL (' + ALL_PLATFORMS.join(', ') + ')'}`);
   if (dryRun) console.log('[scheduler] DRY RUN mode — no posts will be published');
 
-  // Print initial queue status (for primary platform or instagram)
+  // Print initial queue status and upcoming schedule
   const status = await getQueueStatus(platform ?? 'instagram');
   console.log('[scheduler] Queue status:', JSON.stringify(status));
+  await printUpcomingSchedule();
 
   // Define all scheduled jobs
   const jobs = [
@@ -243,6 +287,47 @@ export async function startScheduler(options: SchedulerOptions = {}): Promise<vo
         }
       },
     },
+    {
+      name: 'unfollow',
+      baseInterval: INTERVALS.UNFOLLOW,
+      fn: async () => {
+        // Unfollow non-followers across Instagram, TikTok, and YouTube
+        const platforms = [
+          {
+            name: 'instagram' as const,
+            sessionDir: SESSION_DIRS.instagram,
+            run: async () => {
+              const { runUnfollowSession } = await import('../engagement/unfollow.js');
+              await runUnfollowSession({ dryRun });
+            },
+          },
+          {
+            name: 'tiktok' as const,
+            sessionDir: SESSION_DIRS.tiktok,
+            run: async () => {
+              const { runTikTokUnfollowSession } = await import('../engagement/unfollow-tiktok.js');
+              await runTikTokUnfollowSession({ dryRun });
+            },
+          },
+          {
+            name: 'youtube' as const,
+            sessionDir: SESSION_DIRS.youtube,
+            run: async () => {
+              const { runYouTubeUnsubscribeSession } = await import('../engagement/unfollow-youtube.js');
+              await runYouTubeUnsubscribeSession({ dryRun });
+            },
+          },
+        ];
+
+        for (const p of platforms) {
+          try {
+            await withBrowserLock(p.sessionDir, p.run);
+          } catch (err) {
+            console.error(`[scheduler] unfollow ${p.name} failed:`, err instanceof Error ? err.message : err);
+          }
+        }
+      },
+    },
   ];
 
   // Run each job on its own jittered interval loop
@@ -301,6 +386,9 @@ export async function startScheduler(options: SchedulerOptions = {}): Promise<vo
   await new Promise(() => {});
 }
 
+/** High-frequency jobs that only log when they actually do something. */
+const QUIET_JOBS = new Set(['publish', 'verify-posts', 'caption', 'ingest', 'schedule']);
+
 /**
  * Run a single job in a loop with jittered intervals.
  */
@@ -312,8 +400,10 @@ async function runJobLoop(
 ): Promise<void> {
   while (!signal.aborted) {
     const interval = jitteredInterval(baseInterval);
-    const minutes = Math.round(interval / 60000);
-    console.log(`[scheduler] Next ${name} in ~${minutes} min`);
+    if (!QUIET_JOBS.has(name)) {
+      const minutes = Math.round(interval / 60000);
+      console.log(`[scheduler] Next ${name} in ~${minutes} min`);
+    }
 
     await new Promise<void>((resolve) => {
       const timer = setTimeout(resolve, interval);

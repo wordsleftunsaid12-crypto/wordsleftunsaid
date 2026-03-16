@@ -17,6 +17,16 @@ interface ProcessOptions {
   durationSec: number;
   /** Path to background music track to mix in (optional) */
   musicPath?: string;
+  /** Start offset in seconds into the source clip (for variety) */
+  startOffset?: number;
+  /** Whether to mirror the clip horizontally */
+  hflip?: boolean;
+  /** Color grade variation: saturation multiplier (default ~0.45) */
+  saturation?: number;
+  /** Color grade variation: brightness offset (default ~0.02) */
+  brightness?: number;
+  /** Color balance shift: red shadows (default ~0.08) */
+  colorRs?: number;
 }
 
 /** Tracks recently used clip paths within a session to avoid repeats */
@@ -39,10 +49,11 @@ function getClipsForMood(mood: MessageMood): string[] {
  * Collect all clips across all mood directories.
  */
 function getAllClips(): string[] {
+  if (!fs.existsSync(ASSETS_DIR)) return [];
   const allClips: string[] = [];
   const dirs = fs.readdirSync(ASSETS_DIR).filter((d) => {
     const full = path.join(ASSETS_DIR, d);
-    return fs.statSync(full).isDirectory();
+    try { return fs.statSync(full).isDirectory(); } catch { return false; }
   });
   for (const d of dirs) {
     allClips.push(...getClipsForMood(d as MessageMood));
@@ -95,10 +106,11 @@ export function selectBackgroundMusic(mood: MessageMood): string | null {
   };
 
   const getAllTracks = (): string[] => {
+    if (!fs.existsSync(MUSIC_DIR)) return [];
     const all: string[] = [];
     const dirs = fs.readdirSync(MUSIC_DIR).filter((d) => {
       const full = path.join(MUSIC_DIR, d);
-      return fs.statSync(full).isDirectory();
+      try { return fs.statSync(full).isDirectory(); } catch { return false; }
     });
     for (const d of dirs) {
       all.push(...getTracksForMood(d));
@@ -138,7 +150,14 @@ export async function processBackgroundVideo(
   outputPath: string,
   options: ProcessOptions,
 ): Promise<string> {
-  const { width, height, durationSec, musicPath } = options;
+  const {
+    width, height, durationSec, musicPath,
+    startOffset = 0,
+    hflip = false,
+    saturation = 0.45,
+    brightness = 0.02,
+    colorRs = 0.08,
+  } = options;
 
   // Use blend-mode interpolation to convert any source fps to 30fps.
   // Blend mode crossfades between adjacent frames — produces smooth output
@@ -147,12 +166,13 @@ export async function processBackgroundVideo(
   // Output is 2s longer than the composition needs so Remotion's <Video>
   // component never reaches the last frame of the background.
   const outputDuration = durationSec + 2;
-  const videoFilters = [
+  const filterChain = [
     'minterpolate=fps=30:mi_mode=blend',
     `scale=${width}:${height}:force_original_aspect_ratio=increase:flags=lanczos`,
     `crop=${width}:${height}`,
-    'eq=saturation=0.45:brightness=0.02',
-    'colorbalance=rs=0.08:gs=0.04:bs=-0.04',
+    ...(hflip ? ['hflip'] : []),
+    `eq=saturation=${saturation.toFixed(2)}:brightness=${brightness.toFixed(3)}`,
+    `colorbalance=rs=${colorRs.toFixed(3)}:gs=0.04:bs=-0.04`,
   ].join(',');
 
   const hasMusic = musicPath && fs.existsSync(musicPath);
@@ -164,13 +184,16 @@ export async function processBackgroundVideo(
   // -g 1 forces every frame to be a keyframe (all-intra).
   // This is critical because Remotion seeks frame-by-frame when rendering;
   // without all-intra, the h264 decoder produces artifacts at non-keyframe positions.
+  const seekArgs = startOffset > 0 ? ['-ss', String(startOffset)] : [];
+
   const args = hasMusic
     ? [
         '-y',
+        ...seekArgs,
         '-i', inputPath,
         '-i', musicPath,
         '-t', String(outputDuration),
-        '-vf', videoFilters,
+        '-vf', filterChain,
         '-filter_complex', `[1:a]${audioFilter}[a]`,
         '-map', '0:v',
         '-map', '[a]',
@@ -187,9 +210,10 @@ export async function processBackgroundVideo(
       ]
     : [
         '-y',
+        ...seekArgs,
         '-i', inputPath,
         '-t', String(outputDuration),
-        '-vf', videoFilters,
+        '-vf', filterChain,
         '-c:v', 'libx264',
         '-preset', 'slow',
         '-crf', '12',
@@ -200,8 +224,10 @@ export async function processBackgroundVideo(
         outputPath,
       ];
 
+  const flipLabel = hflip ? ', flipped' : '';
+  const offsetLabel = startOffset > 0 ? `, offset ${startOffset.toFixed(1)}s` : '';
   console.log(`  Processing background: ${path.basename(inputPath)}`);
-  console.log(`    → ${width}x${height}, ${durationSec}s, blend interpolation${hasMusic ? ', + music' : ''}`);
+  console.log(`    → ${width}x${height}, ${durationSec}s, blend${flipLabel}${offsetLabel}${hasMusic ? ', + music' : ''}`);
 
   await execFileAsync('ffmpeg', args);
 
@@ -209,8 +235,48 @@ export async function processBackgroundVideo(
 }
 
 /**
+ * Get the duration of a video file in seconds via ffprobe.
+ */
+async function getClipDuration(filePath: string): Promise<number> {
+  const { stdout } = await execFileAsync('ffprobe', [
+    '-v', 'quiet',
+    '-show_entries', 'format=duration',
+    '-of', 'csv=p=0',
+    filePath,
+  ]);
+  return parseFloat(stdout.trim()) || 0;
+}
+
+/**
+ * Generate random visual transformations for a background clip.
+ * Ensures each render looks distinct even when using the same source clip.
+ */
+function randomTransformations(clipDuration: number, neededDuration: number): {
+  startOffset: number;
+  hflip: boolean;
+  saturation: number;
+  brightness: number;
+  colorRs: number;
+} {
+  // Random start offset: use any part of the clip that leaves enough room
+  const maxOffset = Math.max(0, clipDuration - neededDuration - 2);
+  const startOffset = maxOffset > 1 ? Math.random() * maxOffset : 0;
+
+  // 50% chance of horizontal flip
+  const hflip = Math.random() < 0.5;
+
+  // Subtle color grade variation (keeps the cinematic look but feels different)
+  const saturation = 0.35 + Math.random() * 0.2;   // 0.35 – 0.55
+  const brightness = Math.random() * 0.04;           // 0.00 – 0.04
+  const colorRs = 0.04 + Math.random() * 0.08;       // 0.04 – 0.12
+
+  return { startOffset, hflip, saturation, brightness, colorRs };
+}
+
+/**
  * Select and process a background video for a cinematic render.
- * Always processes a fresh random clip to ensure visual variety across videos.
+ * Applies random transformations (offset, flip, color jitter) so the same
+ * source clip produces visually distinct backgrounds each time.
  */
 export async function prepareBackgroundVideo(
   mood: MessageMood,
@@ -234,11 +300,19 @@ export async function prepareBackgroundVideo(
     console.log(`  Music track: ${path.basename(musicTrack)}`);
   }
 
+  // Probe clip duration and generate random visual transformations
+  const clipDuration = await getClipDuration(rawClip);
+  const durationSec = 8; // 240 frames at 30fps
+  const transforms = randomTransformations(clipDuration, durationSec);
+
+  console.log(`  Transforms: offset=${transforms.startOffset.toFixed(1)}s, flip=${transforms.hflip}, sat=${transforms.saturation.toFixed(2)}`);
+
   await processBackgroundVideo(rawClip, outputPath, {
     width,
     height,
-    durationSec: 8, // 240 frames at 30fps
+    durationSec,
     musicPath: musicTrack ?? undefined,
+    ...transforms,
   });
 
   return outputPath;

@@ -225,19 +225,22 @@ async function createReelPost(
   const shareBtn = page.getByText('Share', { exact: true }).last();
   await shareBtn.click({ timeout: 10000 });
 
-  // 7. Wait for confirmation
+  // 7. Wait for confirmation — this MUST succeed for the post to be recorded
   console.log('[browser-publish] Waiting for upload to complete...');
   try {
-    // Instagram shows "Your reel has been shared" or similar
+    // Instagram shows "Sharing" spinner, then "Your reel has been shared"
+    // Wait for the confirmation text — allow up to 4 minutes for slow uploads
     await page
       .getByText(/has been shared|reel shared|post shared/i)
       .first()
-      .waitFor({ timeout: 120000 }); // Videos can take up to 2 minutes
+      .waitFor({ timeout: 240000 });
     console.log('[browser-publish] Confirmed: Reel shared!');
   } catch {
-    // Even without explicit confirmation text, wait and check
-    console.warn('[browser-publish] No explicit confirmation text, waiting 15s...');
-    await page.waitForTimeout(15000);
+    // No confirmation — take a screenshot and FAIL so we don't record a ghost post
+    await page.screenshot({ path: '/tmp/instagram-post-result.png' }).catch(() => {});
+    throw new Error(
+      'Instagram publish failed: no confirmation text appeared after 4 minutes. Screenshot: /tmp/instagram-post-result.png',
+    );
   }
 }
 

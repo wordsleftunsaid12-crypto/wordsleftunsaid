@@ -147,7 +147,9 @@ export async function captionPendingItems(
     }
   }
 
-  console.log(`[caption] Captioned ${captioned} of ${pendingItems.length} pending item(s)`);
+  if (pendingItems.length > 0) {
+    console.log(`[caption] Captioned ${captioned} of ${pendingItems.length} pending item(s)`);
+  }
   return captioned;
 }
 

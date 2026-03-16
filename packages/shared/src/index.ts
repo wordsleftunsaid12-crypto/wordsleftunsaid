@@ -62,6 +62,7 @@ export {
   getPostsByPlatform,
   getRecentPosts,
   getPostCountToday,
+  getTotalPostCount,
   saveEngagementMetrics,
   getLatestMetrics,
   getAllMetricsForPost,
@@ -84,7 +85,7 @@ export {
 } from './db/posts.js';
 
 // Utils
-export { BRAND } from './utils/brand.js';
+export { BRAND, MAX_VIDEO_CONTENT_LENGTH } from './utils/brand.js';
 export { sanitizeText, sanitizeMessageInput } from './utils/sanitize.js';
 export { moderateContent } from './utils/moderate.js';
 export type { ModerationResult } from './utils/moderate.js';

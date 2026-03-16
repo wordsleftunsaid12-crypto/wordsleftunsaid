@@ -97,9 +97,9 @@ export async function ingestNewVideos(
     newItems++;
   }
 
-  console.log(
-    `[ingest] Scanned ${mp4Files.length} files: ${newItems} new, ${skipped} skipped`,
-  );
+  if (newItems > 0) {
+    console.log(`[ingest] Ingested ${newItems} new file(s) from ${mp4Files.length} scanned`);
+  }
   return { total: mp4Files.length, newItems, skipped };
 }
 

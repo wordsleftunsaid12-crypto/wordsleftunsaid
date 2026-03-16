@@ -22,3 +22,6 @@ export const BRAND = {
   name: 'Words Left Unsent',
   tagline: 'The messages we never sent.',
 } as const;
+
+/** Max message content length (chars) that fits on a CinematicVertical video frame. */
+export const MAX_VIDEO_CONTENT_LENGTH = 250;

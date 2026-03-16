@@ -23,7 +23,7 @@ const OWN_ACCOUNTS = ['unsentwords12', 'wordsleftunsent'];
 const SEARCH_QUERIES = [
   'unsent letter',
   '#unsentletters',
-  '#wordsleftunsaid',
+  '#wordsleftunsent',
   '#dearex',
   '#thingsiwishisaid',
   'things i never told you',
@@ -116,7 +116,7 @@ export async function runTwitterOutboundSession(options: {
       if (result.likes >= remaining.likes && result.comments >= remaining.comments) break;
 
       try {
-        await page.goto(tweetUrl, { waitUntil: 'domcontentloaded', timeout: 20000 });
+        await page.goto(tweetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
         await page.waitForTimeout(3000);
 
         // Get author username from URL
@@ -202,15 +202,15 @@ export async function runTwitterOutboundSession(options: {
 
 async function likeXTweet(page: Page): Promise<boolean> {
   try {
-    const likeBtn = page.locator('[data-testid="like"]').first();
-    if (!(await likeBtn.isVisible({ timeout: 3000 }).catch(() => false))) return false;
-
-    // Check if already liked (button becomes "unlike")
+    // Check if already liked first
     const unlikeBtn = page.locator('[data-testid="unlike"]').first();
-    if (await unlikeBtn.isVisible({ timeout: 500 }).catch(() => false)) return false;
+    if (await unlikeBtn.isVisible({ timeout: 1000 }).catch(() => false)) return false;
+
+    const likeBtn = page.locator('[data-testid="like"]').first();
+    if (!(await likeBtn.isVisible({ timeout: 5000 }).catch(() => false))) return false;
 
     await likeBtn.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(1000);
     return true;
   } catch {
     return false;
@@ -264,8 +264,11 @@ async function replyToXTweet(page: Page, text: string): Promise<boolean> {
     await page.waitForTimeout(1000);
 
     // Click the Reply/Post button
-    const postBtn = page.locator('[data-testid="tweetButtonInline"]').first()
-      .or(page.locator('[data-testid="tweetButton"]').first());
+    const inlineBtn = page.locator('[data-testid="tweetButtonInline"]').first();
+    const regularBtn = page.locator('[data-testid="tweetButton"]').first();
+    const postBtn = (await inlineBtn.isVisible({ timeout: 2000 }).catch(() => false))
+      ? inlineBtn
+      : regularBtn;
     if (await postBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
       await postBtn.click();
       await page.waitForTimeout(2000);

@@ -1,16 +1,19 @@
 /**
  * Post-publish QA verification orchestrator.
- * Checks if recently published posts actually appeared on each platform.
  *
- * Strategy: Only verify the MOST RECENT post per platform per cycle.
- * - If the latest post is on the profile, older ones almost certainly are too.
- * - This avoids opening the browser N times per platform.
- * - Posts that can't be verified get marked so they aren't retried endlessly.
+ * Strategy: For each platform, count posts on the actual platform profile
+ * and compare against the DB record count. Take screenshots as evidence.
+ * This catches "ghost posts" — posts recorded in DB but not on the platform.
  */
-import { getUnverifiedPosts, updatePostVerification } from '@wlu/shared';
+import { getTotalPostCount, updatePostVerification, getUnverifiedPosts, getContentQueue } from '@wlu/shared';
 import type { Post, Platform } from '@wlu/shared';
 import { withBrowserLock } from '../platforms/browser-lock.js';
 import { resolve } from 'node:path';
+
+/** All platforms we post to and can verify. */
+const VERIFIABLE_PLATFORMS: Platform[] = [
+  'instagram', 'tiktok', 'youtube', 'reddit', 'twitter', 'threads', 'pinterest',
+];
 
 /** Map platform → browser session directory. */
 const SESSION_DIRS: Record<string, string> = {
@@ -18,57 +21,21 @@ const SESSION_DIRS: Record<string, string> = {
   tiktok: resolve(process.env.HOME ?? '.', '.wlu-tiktok-session'),
   youtube: resolve(process.env.HOME ?? '.', '.wlu-youtube-session'),
   reddit: resolve(process.env.HOME ?? '.', '.wlu-reddit-session'),
-  pinterest: resolve(process.env.HOME ?? '.', '.wlu-pinterest-session'),
   twitter: resolve(process.env.HOME ?? '.', '.wlu-twitter-session'),
   threads: resolve(process.env.HOME ?? '.', '.wlu-threads-session'),
+  pinterest: resolve(process.env.HOME ?? '.', '.wlu-pinterest-session'),
 };
 
-/** Max time (ms) a single platform verification can take before aborting. */
+/** Max time (ms) a single platform verification can take. */
 const VERIFY_TIMEOUT_MS = 60_000;
 
-interface VerificationResult {
-  verified: boolean;
-  postUrl?: string;
+interface PlatformVerifyResult {
+  platform: Platform;
+  dbCount: number;
+  platformCount: number;
+  match: boolean;
+  screenshotPath?: string;
   error?: string;
-}
-
-/** Platform-specific verifier function type. */
-type Verifier = (post: Post) => Promise<VerificationResult>;
-
-/** Lazy-load verifiers to avoid importing all browser modules at startup. */
-async function getVerifier(platform: Platform): Promise<Verifier | null> {
-  switch (platform) {
-    case 'instagram': {
-      const { verifyInstagramPost } = await import('./verify-instagram.js');
-      return verifyInstagramPost;
-    }
-    case 'tiktok': {
-      const { verifyTikTokPost } = await import('./verify-tiktok.js');
-      return verifyTikTokPost;
-    }
-    case 'youtube': {
-      const { verifyYouTubePost } = await import('./verify-youtube.js');
-      return verifyYouTubePost;
-    }
-    case 'reddit': {
-      const { verifyRedditPost } = await import('./verify-reddit.js');
-      return verifyRedditPost;
-    }
-    case 'twitter': {
-      const { verifyTwitterPost } = await import('./verify-twitter.js');
-      return verifyTwitterPost;
-    }
-    case 'threads': {
-      const { verifyThreadsPost } = await import('./verify-threads.js');
-      return verifyThreadsPost;
-    }
-    case 'pinterest': {
-      const { verifyPinterestPost } = await import('./verify-pinterest.js');
-      return verifyPinterestPost;
-    }
-    default:
-      return null;
-  }
 }
 
 /** Wrap a promise with a timeout. */
@@ -82,107 +49,250 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
   });
 }
 
+/** Get the platform-specific count function. */
+async function getPlatformCount(
+  platform: Platform,
+): Promise<{ platformCount: number; screenshotPath?: string }> {
+  // All verifiers follow the same pattern: launch browser → count posts → screenshot
+  const dummy = {} as Post;
+
+  switch (platform) {
+    case 'instagram': {
+      const { verifyInstagramPost } = await import('./verify-instagram.js');
+      const r = await verifyInstagramPost(dummy);
+      return { platformCount: r.platformCount, screenshotPath: r.screenshotPath };
+    }
+    case 'tiktok': {
+      const { verifyTikTokPost } = await import('./verify-tiktok.js');
+      const r = await verifyTikTokPost(dummy);
+      return { platformCount: r.platformCount, screenshotPath: r.screenshotPath };
+    }
+    case 'youtube': {
+      const { verifyYouTubePost } = await import('./verify-youtube.js');
+      const r = await verifyYouTubePost(dummy);
+      return { platformCount: r.platformCount, screenshotPath: r.screenshotPath };
+    }
+    case 'reddit': {
+      const { verifyRedditPost } = await import('./verify-reddit.js');
+      const r = await verifyRedditPost(dummy);
+      return { platformCount: r.platformCount, screenshotPath: r.screenshotPath };
+    }
+    case 'twitter': {
+      const { verifyTwitterPost } = await import('./verify-twitter.js');
+      const r = await verifyTwitterPost(dummy);
+      return { platformCount: r.platformCount, screenshotPath: r.screenshotPath };
+    }
+    case 'threads': {
+      const { verifyThreadsPost } = await import('./verify-threads.js');
+      const r = await verifyThreadsPost(dummy);
+      return { platformCount: r.platformCount, screenshotPath: r.screenshotPath };
+    }
+    case 'pinterest': {
+      const { verifyPinterestPost } = await import('./verify-pinterest.js');
+      const r = await verifyPinterestPost(dummy);
+      return { platformCount: r.platformCount, screenshotPath: r.screenshotPath };
+    }
+    default:
+      throw new Error(`No verifier for ${platform}`);
+  }
+}
+
 /**
- * Verify recent posts — one per platform per cycle.
+ * Run QA verification across all platforms.
  *
- * Only checks the most recent unverified post for each platform.
- * If it's verified, all older posts for that platform are bulk-marked verified.
- * This prevents opening the browser repeatedly for many posts.
+ * For each platform:
+ * 1. Get DB post count
+ * 2. Navigate to platform profile and count posts
+ * 3. Compare counts and report discrepancies
+ * 4. Take screenshots as evidence
+ *
+ * Also marks any unverified posts as verified/failed based on the count comparison.
  */
 export async function verifyRecentPosts(): Promise<{
   verified: number;
   failed: number;
   skipped: number;
+  results: PlatformVerifyResult[];
 }> {
-  const unverified = await getUnverifiedPosts(24);
-
-  if (unverified.length === 0) {
-    console.log('[verify] No unverified posts');
-    return { verified: 0, failed: 0, skipped: 0 };
-  }
-
-  console.log(`[verify] Found ${unverified.length} unverified post(s)`);
-
-  // Group by platform — posts are ordered newest first from the query
-  const byPlatform = new Map<Platform, Post[]>();
-  for (const post of unverified) {
-    const list = byPlatform.get(post.platform) ?? [];
-    list.push(post);
-    byPlatform.set(post.platform, list);
-  }
-
+  const results: PlatformVerifyResult[] = [];
   let verified = 0;
   let failed = 0;
   let skipped = 0;
 
-  for (const [platform, posts] of byPlatform) {
-    const verifier = await getVerifier(platform);
-    if (!verifier) {
-      console.log(`[verify] No verifier for ${platform} — skipping ${posts.length} post(s)`);
-      skipped += posts.length;
-      continue;
-    }
-
-    // Only verify the MOST RECENT post (first in the array, since sorted desc)
-    const latestPost = posts[0];
-    const olderPosts = posts.slice(1);
+  for (const platform of VERIFIABLE_PLATFORMS) {
     const sessionDir = SESSION_DIRS[platform];
 
-    console.log(`[verify] Checking ${platform} (most recent of ${posts.length})...`);
-
     try {
+      // Get DB count for this platform
+      const dbCount = await getTotalPostCount(platform);
+
+      // Get platform count via browser
       const doVerify = () => withTimeout(
-        verifier(latestPost),
+        getPlatformCount(platform),
         VERIFY_TIMEOUT_MS,
         `${platform} verification`,
       );
 
-      const result = await (sessionDir
+      const { platformCount, screenshotPath } = await (sessionDir
         ? withBrowserLock(sessionDir, doVerify)
         : doVerify());
 
-      await updatePostVerification(latestPost.id, {
-        verified: result.verified,
-        verificationError: result.error,
-        platformPostUrl: result.postUrl,
-      });
+      const match = platformCount >= dbCount;
+      const result: PlatformVerifyResult = {
+        platform,
+        dbCount,
+        platformCount,
+        match,
+        screenshotPath,
+      };
 
-      if (result.verified) {
-        console.log(`[verify] ${platform} — VERIFIED${result.postUrl ? ` (${result.postUrl})` : ''}`);
+      if (match) {
+        console.log(
+          `[verify] ${platform} — OK (platform: ${platformCount}, db: ${dbCount})`,
+        );
         verified++;
-
-        // Bulk-mark older posts as verified too (if latest is live, older ones are too)
-        for (const older of olderPosts) {
-          await updatePostVerification(older.id, {
-            verified: true,
-            verificationError: undefined,
-            platformPostUrl: undefined,
-          });
-          verified++;
-        }
-        if (olderPosts.length > 0) {
-          console.log(`[verify] ${platform} — bulk-verified ${olderPosts.length} older post(s)`);
-        }
       } else {
-        console.warn(`[verify] ${platform} — NOT FOUND: ${result.error ?? 'unknown'}`);
+        const missing = dbCount - platformCount;
+        console.warn(
+          `[verify] ${platform} — MISMATCH: platform has ${platformCount} but DB has ${dbCount} (${missing} ghost posts)`,
+        );
         failed++;
-        // Don't fail older posts — they might just be from before the profile loaded
-        skipped += olderPosts.length;
       }
+
+      results.push(result);
+
+      // Mark unverified posts based on count comparison
+      await markUnverifiedPosts(platform, match);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error(`[verify] ${platform} error: ${msg}`);
-
-      // Mark as failed with error so it's not retried endlessly
-      await updatePostVerification(latestPost.id, {
-        verified: false,
-        verificationError: msg,
+      results.push({
+        platform,
+        dbCount: 0,
+        platformCount: 0,
+        match: false,
+        error: msg,
       });
       failed++;
-      skipped += olderPosts.length;
     }
   }
 
-  console.log(`[verify] Done — verified: ${verified}, failed: ${failed}, skipped: ${skipped}`);
-  return { verified, failed, skipped };
+  // Check for failed queue items (publishes that crashed before reaching the posts table)
+  const failedQueueItems = await checkFailedQueueItems();
+
+  // Check cross-platform balance
+  const balanceWarnings = checkCrossPlatformBalance(results);
+
+  // Print summary
+  console.log('\n[verify] ═══ QA Summary ═══');
+  for (const r of results) {
+    const status = r.error ? 'ERROR' : r.match ? 'OK' : 'MISMATCH';
+    const detail = r.error
+      ? r.error
+      : `platform: ${r.platformCount}, db: ${r.dbCount}`;
+    console.log(`[verify]   ${r.platform.padEnd(12)} ${status.padEnd(10)} ${detail}`);
+    if (r.screenshotPath) {
+      console.log(`[verify]   ${''.padEnd(12)} screenshot: ${r.screenshotPath}`);
+    }
+  }
+
+  if (failedQueueItems.length > 0) {
+    console.log('[verify]');
+    console.log('[verify]   FAILED QUEUE ITEMS (publish crashed before recording):');
+    for (const item of failedQueueItems) {
+      console.log(`[verify]     ${item.platform.padEnd(12)} ${item.count} failed — ${item.lastError}`);
+    }
+    failed += failedQueueItems.length;
+  }
+
+  if (balanceWarnings.length > 0) {
+    console.log('[verify]');
+    console.log('[verify]   BALANCE WARNINGS:');
+    for (const w of balanceWarnings) {
+      console.log(`[verify]     ${w}`);
+    }
+  }
+
+  console.log('[verify] ═══════════════════\n');
+
+  return { verified, failed, skipped, results };
+}
+
+/**
+ * Mark unverified posts for a platform as verified or failed
+ * based on whether the platform count matches the DB count.
+ */
+async function markUnverifiedPosts(
+  platform: Platform,
+  countsMatch: boolean,
+): Promise<void> {
+  const unverified = await getUnverifiedPosts(72); // Check last 3 days
+
+  const platformPosts = unverified.filter((p) => p.platform === platform);
+  if (platformPosts.length === 0) return;
+
+  for (const post of platformPosts) {
+    try {
+      await updatePostVerification(post.id, {
+        verified: countsMatch,
+        verificationError: countsMatch
+          ? undefined
+          : 'Platform post count is lower than DB count — post may not have been published',
+      });
+    } catch {
+      // Ignore individual update errors
+    }
+  }
+
+  if (platformPosts.length > 0) {
+    console.log(
+      `[verify] Marked ${platformPosts.length} ${platform} post(s) as ${countsMatch ? 'verified' : 'failed'}`,
+    );
+  }
+}
+
+/**
+ * Check the content_queue for failed items that never made it to the posts table.
+ * These represent publish attempts that crashed (e.g., Pinterest button timeout).
+ */
+async function checkFailedQueueItems(): Promise<
+  Array<{ platform: string; count: number; lastError: string }>
+> {
+  const failedItems: Array<{ platform: string; count: number; lastError: string }> = [];
+
+  for (const platform of VERIFIABLE_PLATFORMS) {
+    const items = await getContentQueue({ status: 'failed', platform, limit: 20 });
+    if (items.length > 0) {
+      const lastError = items[0].errorMessage?.slice(0, 120) ?? 'unknown error';
+      failedItems.push({ platform, count: items.length, lastError });
+    }
+  }
+
+  return failedItems;
+}
+
+/**
+ * Check if any platform has significantly fewer posts than others,
+ * which indicates a systemic publishing issue.
+ */
+function checkCrossPlatformBalance(results: PlatformVerifyResult[]): string[] {
+  const warnings: string[] = [];
+  const validResults = results.filter((r) => !r.error);
+  if (validResults.length < 3) return warnings;
+
+  const counts = validResults.map((r) => r.dbCount);
+  const maxCount = Math.max(...counts);
+
+  // If the max count is at least 3, check for platforms that are far behind
+  if (maxCount >= 3) {
+    for (const r of validResults) {
+      if (r.dbCount < maxCount * 0.4) {
+        warnings.push(
+          `${r.platform} has only ${r.dbCount} posts (others have up to ${maxCount}) — check for config/publish issues`,
+        );
+      }
+    }
+  }
+
+  return warnings;
 }

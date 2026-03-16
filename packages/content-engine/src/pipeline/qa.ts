@@ -62,7 +62,7 @@ async function getVideoMetadata(videoPath: string): Promise<VideoMetadata> {
     videoPath,
   ]);
 
-  const info = JSON.parse(stdout) as {
+  let info: {
     streams: Array<{
       codec_type: string;
       codec_name: string;
@@ -72,6 +72,12 @@ async function getVideoMetadata(videoPath: string): Promise<VideoMetadata> {
     }>;
     format: { duration: string; size: string };
   };
+
+  try {
+    info = JSON.parse(stdout);
+  } catch {
+    throw new Error(`Failed to parse ffprobe output: ${stdout.slice(0, 200)}`);
+  }
 
   const videoStream = info.streams.find((s) => s.codec_type === 'video');
   if (!videoStream) throw new Error('No video stream found');

@@ -76,7 +76,7 @@ function mapOutbound(row: Row): OutboundEngagement {
 function mapFollower(row: Row): FollowerSnapshot {
   return {
     id: row.id as string,
-    platform: row.platform as string,
+    platform: row.platform as Platform,
     followerCount: row.follower_count as number,
     followingCount: row.following_count as number,
     measuredAt: row.measured_at as string,
@@ -176,11 +176,29 @@ export async function deletePost(id: string): Promise<void> {
   const client = getServiceClient();
 
   // Delete related engagement metrics and comments first
-  await client.from('engagement_metrics').delete().eq('post_id', id);
-  await client.from('comment_tracking').delete().eq('post_id', id);
+  const { error: metricsErr } = await client.from('engagement_metrics').delete().eq('post_id', id);
+  if (metricsErr) throw new Error(`Failed to delete engagement metrics for post: ${metricsErr.message}`);
+
+  const { error: commentsErr } = await client.from('comment_tracking').delete().eq('post_id', id);
+  if (commentsErr) throw new Error(`Failed to delete comment tracking for post: ${commentsErr.message}`);
 
   const { error } = await client.from('posts').delete().eq('id', id);
   if (error) throw new Error(`Failed to delete post: ${error.message}`);
+}
+
+/**
+ * Get total post count for a platform (all time).
+ */
+export async function getTotalPostCount(platform: Platform): Promise<number> {
+  const client = getServiceClient();
+
+  const { count, error } = await client
+    .from('posts')
+    .select('*', { count: 'exact', head: true })
+    .eq('platform', platform);
+
+  if (error) throw new Error(`Failed to count total posts: ${error.message}`);
+  return count ?? 0;
 }
 
 export async function getPostCountToday(platform: Platform): Promise<number> {
@@ -204,7 +222,7 @@ export async function getPostCountToday(platform: Platform): Promise<number> {
 export async function getTodayPosts(platform?: Platform): Promise<Post[]> {
   const client = getServiceClient();
   const today = new Date();
-  today.setUTCHours(0, 0, 0, 0);
+  today.setHours(0, 0, 0, 0);
 
   let query = client
     .from('posts')
@@ -379,14 +397,19 @@ export async function getLatestMetrics(postId: string): Promise<EngagementMetric
   return data.length > 0 ? mapMetric(data[0] as Row) : null;
 }
 
-export async function getAllMetricsForPost(postId: string): Promise<EngagementMetric[]> {
+export async function getAllMetricsForPost(
+  postId: string,
+  filters: { limit?: number; offset?: number } = {},
+): Promise<EngagementMetric[]> {
+  const { limit = 1000, offset = 0 } = filters;
   const client = getServiceClient();
 
   const { data, error } = await client
     .from('engagement_metrics')
     .select('*')
     .eq('post_id', postId)
-    .order('measured_at', { ascending: true });
+    .order('measured_at', { ascending: true })
+    .range(offset, offset + limit - 1);
 
   if (error) throw new Error(`Failed to fetch metrics: ${error.message}`);
   return (data as Row[]).map(mapMetric);
@@ -610,7 +633,9 @@ export async function saveFollowerSnapshot(input: {
 export async function getFollowerHistory(
   platform: Platform,
   daysBack: number = 30,
+  filters: { limit?: number; offset?: number } = {},
 ): Promise<FollowerSnapshot[]> {
+  const { limit = 1000, offset = 0 } = filters;
   const client = getServiceClient();
   const since = new Date(Date.now() - daysBack * 86400000).toISOString();
 
@@ -619,7 +644,8 @@ export async function getFollowerHistory(
     .select('*')
     .eq('platform', platform)
     .gte('measured_at', since)
-    .order('measured_at', { ascending: true });
+    .order('measured_at', { ascending: true })
+    .range(offset, offset + limit - 1);
 
   if (error) throw new Error(`Failed to fetch follower history: ${error.message}`);
   return (data as Row[]).map(mapFollower);

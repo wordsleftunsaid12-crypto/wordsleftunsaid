@@ -64,9 +64,21 @@ async function main(): Promise<void> {
     }
 
     case 'unfollow': {
-      const { runUnfollowSession } = await import('./engagement/unfollow.js');
       const maxUnfollows = parseInt(flags.find((f) => f.startsWith('--max='))?.split('=')[1] ?? '15', 10);
-      await runUnfollowSession({ dryRun, maxUnfollows });
+      const target: Platform | 'all' = platformFlag ?? 'all';
+
+      if (target === 'all' || target === 'instagram') {
+        const { runUnfollowSession } = await import('./engagement/unfollow.js');
+        await runUnfollowSession({ dryRun, maxUnfollows });
+      }
+      if (target === 'all' || target === 'tiktok') {
+        const { runTikTokUnfollowSession } = await import('./engagement/unfollow-tiktok.js');
+        await runTikTokUnfollowSession({ dryRun, maxUnfollows: Math.min(maxUnfollows, 10) });
+      }
+      if (target === 'all' || target === 'youtube') {
+        const { runYouTubeUnsubscribeSession } = await import('./engagement/unfollow-youtube.js');
+        await runYouTubeUnsubscribeSession({ dryRun, maxUnsubscribes: Math.min(maxUnfollows, 5) });
+      }
       break;
     }
 
@@ -105,7 +117,7 @@ async function main(): Promise<void> {
       console.log('  caption        Generate captions for pending items');
       console.log('  engage         Reply to comments on recent posts');
       console.log('  outbound       Like/follow/comment on related accounts');
-      console.log('  unfollow       Unfollow non-followers on Instagram');
+      console.log('  unfollow       Unfollow non-followers (Instagram, TikTok, YouTube)');
       console.log('  followers      Scrape follower counts from all platforms');
       console.log('  seed-messages  Seed website with new anonymous messages');
       console.log('  status         Show content queue status');

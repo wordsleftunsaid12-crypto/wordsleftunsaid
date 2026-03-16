@@ -20,23 +20,6 @@ ${messages.map((m, i) => `${i + 1}. [${m.id}] From: "${m.from}" To: "${m.to}" â€
 Respond with ONLY a JSON array, no other text:
 [{"id": "uuid", "mood": "tender|regretful|hopeful|bittersweet|raw", "reason": "brief reason"}]`;
 
-export const VARIATION_SYSTEM_PROMPT = `You are a creative writer for "Words Left Unsent." You create emotionally resonant variations of anonymous messages for video content.
-
-Guidelines:
-- Maintain the original emotional intent
-- Keep under 200 characters
-- Tone: vulnerable, authentic, poetic but not overwrought
-- Never add names or identifying information
-- Each variation should feel like a real unsent message`;
-
-export const VARIATION_USER_PROMPT = (message: { from: string; to: string; content: string }) =>
-  `Create 3 variations of this message, each with a slightly different emotional angle:
-
-Original: From "${message.from}" to "${message.to}": "${message.content}"
-
-Respond with ONLY a JSON array, no other text:
-[{"variation": "the message text", "mood": "tender|regretful|hopeful|bittersweet|raw"}]`;
-
 export const CAPTION_SYSTEM_PROMPT = `You write social media captions for "Words Left Unsent," an anonymous message platform.
 
 Style: empathetic, thoughtful, never clickbaity. Use the emotional weight of the message itself. Keep captions short (1-2 sentences) with a call to action.`;

@@ -300,20 +300,19 @@ async function waitForConfirmation(page: Page): Promise<void> {
     // No confirmation button needed
   }
 
+  // Wait for success message — this MUST succeed for the post to be recorded
   try {
-    // Wait for success message
     await page
       .locator('text=/uploaded|published|posted|Your video is being/i')
       .first()
       .waitFor({ timeout: 120000 });
     console.log('[tiktok-publish] Confirmed: Video posted!');
   } catch {
-    // Even without confirmation text, wait and check
-    console.warn('[tiktok-publish] No explicit confirmation text, waiting 15s...');
-    await page.waitForTimeout(15000);
-
-    // Take a screenshot for verification
+    // No confirmation — take a screenshot and FAIL so we don't record a ghost post
     await page.screenshot({ path: '/tmp/tiktok-post-result.png' }).catch(() => {});
+    throw new Error(
+      'TikTok publish failed: no confirmation text appeared after 2 minutes. Screenshot: /tmp/tiktok-post-result.png',
+    );
   }
 }
 

@@ -249,7 +249,8 @@ async function getYouTubeUsername(page: Page): Promise<string | null> {
 async function likeYouTubeShort(page: Page): Promise<boolean> {
   try {
     // The like button has aria-label like "like this video along with X other people"
-    const likeBtn = page.locator('button[aria-label*="like this video"]').first();
+    // Exclude dislike button which also contains "like this video" as a substring
+    const likeBtn = page.locator('button[aria-label*="like this video"]:not([aria-label*="Dislike"])').first();
 
     if (!(await likeBtn.isVisible({ timeout: 3000 }).catch(() => false))) {
       return false;

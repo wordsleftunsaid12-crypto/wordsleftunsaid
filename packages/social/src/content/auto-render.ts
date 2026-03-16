@@ -13,6 +13,7 @@ import {
   getApprovedMessages,
   getUsedMessageIds,
   createApprovedMessage,
+  MAX_VIDEO_CONTENT_LENGTH,
 } from '@wlu/shared';
 import { MESSAGE_POOL } from './message-seeder.js';
 
@@ -29,7 +30,7 @@ const MIN_UNUSED_MESSAGES = 3;
 interface AutoRenderResult {
   rendered: number;
   seeded: number;
-  qaPasssed: number;
+  qaPassed: number;
   errors: number;
 }
 
@@ -44,22 +45,26 @@ async function ensureUnusedMessages(needed: number): Promise<number> {
   ]);
 
   const usedSet = new Set(usedIds);
-  const unused = allMessages.filter((m) => !usedSet.has(m.id));
+  // Only count messages short enough for video rendering
+  const unused = allMessages.filter(
+    (m) => !usedSet.has(m.id) && m.content.length <= MAX_VIDEO_CONTENT_LENGTH,
+  );
 
   if (unused.length >= needed) {
-    console.log(`[auto-render] ${unused.length} unused messages available`);
+    console.log(`[auto-render] ${unused.length} unused messages available (≤${MAX_VIDEO_CONTENT_LENGTH} chars)`);
     return 0;
   }
 
   const toSeed = needed - unused.length;
-  console.log(`[auto-render] Only ${unused.length} unused messages, seeding ${toSeed} more...`);
+  console.log(`[auto-render] Only ${unused.length} unused short messages, seeding ${toSeed} more...`);
 
-  // Find templates not already in DB
+  // Find templates not already in DB, short enough for video
   const existingContents = new Set(
     allMessages.map((m) => m.content.toLowerCase().trim()),
   );
   const available = MESSAGE_POOL.filter(
-    (t) => !existingContents.has(t.content.toLowerCase().trim()),
+    (t) => !existingContents.has(t.content.toLowerCase().trim())
+      && t.content.length <= MAX_VIDEO_CONTENT_LENGTH,
   );
 
   if (available.length === 0) {
@@ -100,7 +105,7 @@ export async function renderNextContent(options: {
   count?: number;
 } = {}): Promise<AutoRenderResult> {
   const { dryRun = false, count = VIDEOS_PER_CYCLE } = options;
-  const result: AutoRenderResult = { rendered: 0, seeded: 0, qaPasssed: 0, errors: 0 };
+  const result: AutoRenderResult = { rendered: 0, seeded: 0, qaPassed: 0, errors: 0 };
 
   try {
     // Step 1: Ensure enough messages
@@ -151,8 +156,8 @@ export async function renderNextContent(options: {
 
     // Parse QA results
     const qaMatch = qaResult.stdout.match(/(\d+) passed/);
-    result.qaPasssed = qaMatch ? parseInt(qaMatch[1], 10) : 0;
-    console.log(`[auto-render] QA complete: ${result.qaPasssed} passed`);
+    result.qaPassed = qaMatch ? parseInt(qaMatch[1], 10) : 0;
+    console.log(`[auto-render] QA complete: ${result.qaPassed} passed`);
 
     if (qaResult.stderr) {
       console.warn('[auto-render] QA stderr:', qaResult.stderr.slice(0, 200));
@@ -164,7 +169,7 @@ export async function renderNextContent(options: {
   }
 
   console.log(
-    `[auto-render] Cycle complete: ${result.rendered} rendered, ${result.qaPasssed} QA passed, ${result.seeded} seeded, ${result.errors} errors`,
+    `[auto-render] Cycle complete: ${result.rendered} rendered, ${result.qaPassed} QA passed, ${result.seeded} seeded, ${result.errors} errors`,
   );
   return result;
 }

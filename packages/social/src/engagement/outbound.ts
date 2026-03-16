@@ -67,9 +67,9 @@ export async function runOutboundSession(
 
   // Check current daily counts
   const [likesToday, followsToday, commentsToday] = await Promise.all([
-    getOutboundEngagementCountToday('like'),
-    getOutboundEngagementCountToday('follow'),
-    getOutboundEngagementCountToday('comment'),
+    getOutboundEngagementCountToday('like', 'instagram'),
+    getOutboundEngagementCountToday('follow', 'instagram'),
+    getOutboundEngagementCountToday('comment', 'instagram'),
   ]);
 
   const remaining = {

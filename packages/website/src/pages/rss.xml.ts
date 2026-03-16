@@ -11,7 +11,8 @@ function escapeXml(text: string): string {
 }
 
 export const GET: APIRoute = async ({ site }) => {
-  const siteUrl = site?.toString() ?? 'https://wordsleftunsent.com';
+  const siteUrl = site?.toString() ?? 'https://wordsleftunsent.com/';
+  // Ensure trailing slash for proper URL construction
   const messages = await getApprovedMessages({ limit: 50 });
 
   const items = messages

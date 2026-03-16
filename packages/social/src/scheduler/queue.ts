@@ -5,7 +5,7 @@ import {
   getLatestStrategyBrief,
   getOverdueItems,
 } from '@wlu/shared';
-import type { ContentQueueItem, StrategyBrief, Platform } from '@wlu/shared';
+import type { StrategyBrief, Platform } from '@wlu/shared';
 
 /** Per-platform default posting hours in Pacific Time (America/Los_Angeles). */
 const PLATFORM_DEFAULTS: Record<Platform, number[]> = {
@@ -61,7 +61,6 @@ export async function scheduleCaptionedItems(
 
   const captionedItems = await getContentQueue({ status: 'captioned', platform });
   if (captionedItems.length === 0) {
-    console.log('[queue] No captioned items to schedule');
     return 0;
   }
 
@@ -168,8 +167,8 @@ async function getPreferredPostingHours(
         return brief.bestPostingHours;
       }
     }
-  } catch {
-    // Fall through to defaults on any error
+  } catch (err) {
+    console.warn('[queue] Failed to fetch posting hours config:', err instanceof Error ? err.message : err);
   }
 
   // 3. Per-platform defaults (converted from Pacific to UTC)
@@ -183,7 +182,6 @@ async function getPreferredPostingHours(
  */
 export async function catchUpMissedSlots(
   platform: Platform,
-  maxPerDay: number = 3,
 ): Promise<number> {
   const overdue = await getOverdueItems(platform);
   if (overdue.length === 0) return 0;
@@ -191,8 +189,9 @@ export async function catchUpMissedSlots(
   console.log(`[queue] Found ${overdue.length} overdue items for ${platform}`);
 
   const preferredHours = await getPreferredPostingHours(platform);
-  const slotsNeeded = Math.min(overdue.length, maxPerDay);
-  const newSlots = computeNextSlots(preferredHours, slotsNeeded);
+  // Request slots for ALL overdue items — they'll spread across multiple days
+  // if needed. The daily publish limit handles per-day throttling.
+  const newSlots = computeNextSlots(preferredHours, overdue.length);
 
   let rescheduled = 0;
 
@@ -201,8 +200,8 @@ export async function catchUpMissedSlots(
     const newSlot = newSlots[i];
 
     if (!newSlot) {
-      // No more slots today — keep as scheduled (will be picked up next cycle)
-      console.log(`[queue] No more slots for ${item.id.slice(0, 8)} — keeping scheduled`);
+      // Shouldn't happen (computeNextSlots looks 7 days ahead), but just in case
+      console.log(`[queue] No available slot for ${item.id.slice(0, 8)} — keeping scheduled`);
       continue;
     }
 

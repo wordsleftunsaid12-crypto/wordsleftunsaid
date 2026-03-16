@@ -1,68 +1,89 @@
 import type { Post } from '@wlu/shared';
-import { launchTikTok, navigateToProfile } from '../platforms/tiktok/browser.js';
-import { extractSnippet, textContains } from './match-utils.js';
+import { launchTikTok, navigateToProfile, dismissModals } from '../platforms/tiktok/browser.js';
 
 interface VerificationResult {
   verified: boolean;
+  platformCount: number;
   postUrl?: string;
   error?: string;
+  screenshotPath?: string;
 }
 
 /**
- * Verify a TikTok post exists by checking the profile's most recent video.
+ * Verify TikTok posts by counting videos on the profile.
+ * Navigates to our profile, reads the video count from the stats header,
+ * and takes a screenshot as evidence.
  */
 export async function verifyTikTokPost(post: Post): Promise<VerificationResult> {
   const { context, page } = await launchTikTok();
 
   try {
     await navigateToProfile(page, 'u.wordsleftunsaid');
-    await page.waitForTimeout(5000);
+    await page.waitForTimeout(3000);
 
-    // TikTok changes selectors frequently — use multiple strategies to find videos
-    const videoSelectors = [
-      '[data-e2e="user-post-item"] a',
-      'div[class*="DivItemContainer"] a',
-      'a[href*="/video/"]',
-      'div[class*="video-feed"] a',
-      // Broad fallback: any clickable item in the main content area
-      'main a[href*="/@"]',
-    ];
+    // Dismiss cookie consent and other modals that block content
+    await dismissModals(page);
 
-    let videoFound = false;
-    for (const selector of videoSelectors) {
-      const el = page.locator(selector).first();
-      if (await el.isVisible({ timeout: 3000 }).catch(() => false)) {
-        videoFound = true;
+    // Also try the explicit cookie banner buttons (TikTok shows a full-page overlay)
+    const allowCookiesBtn = page.getByRole('button', { name: /allow all|accept all|allow cookies/i }).first();
+    const declineCookiesBtn = page.getByRole('button', { name: /decline optional|reject/i }).first();
+    for (const btn of [declineCookiesBtn, allowCookiesBtn]) {
+      if (await btn.isVisible({ timeout: 1500 }).catch(() => false)) {
+        await btn.click();
+        console.log('[verify-tk] Dismissed cookie consent');
+        await page.waitForTimeout(2000);
         break;
       }
     }
 
-    if (!videoFound) {
-      // Final fallback: check if the profile page has any image thumbnails (video covers)
-      const anyImg = page.locator('main img, [class*="DivWrapper"] img').first();
-      if (await anyImg.isVisible({ timeout: 3000 }).catch(() => false)) {
-        videoFound = true;
+    await page.waitForTimeout(3000);
+
+    // Take screenshot of profile
+    const screenshotPath = '/tmp/verify-tiktok-profile.png';
+    await page.screenshot({ path: screenshotPath }).catch(() => {});
+
+    // Read the body text to find video count
+    // TikTok profiles show: "X Following  Y Followers  Z Likes" and video count near tabs
+    const bodyText = await page.textContent('body').catch(() => '') ?? '';
+
+    // Try to find "X Videos" text (TikTok shows this in the tabs area)
+    const videoCountMatch = bodyText.match(/(\d[\d,]*)\s*Videos?/i);
+    if (videoCountMatch) {
+      const count = parseInt(videoCountMatch[1].replace(/,/g, ''), 10);
+      console.log(`[verify-tk] Profile shows ${count} videos`);
+      return { verified: true, platformCount: count, screenshotPath };
+    }
+
+    // Fallback: count video thumbnails on the profile
+    const videoSelectors = [
+      '[data-e2e="user-post-item"]',
+      'div[class*="DivItemContainer"]',
+      'div[class*="DivVideoFeed"] a',
+      'a[href*="/video/"]',
+      // TikTok also uses @username/video/ID pattern in links
+      `a[href*="/@u.wordsleftunsaid/video/"]`,
+    ];
+
+    for (const selector of videoSelectors) {
+      const count = await page.locator(selector).count();
+      if (count > 0) {
+        console.log(`[verify-tk] Found ${count} video elements (via ${selector})`);
+        return { verified: true, platformCount: count, screenshotPath };
       }
     }
 
-    if (!videoFound) {
-      // Check page text for follower/following counts as proof profile loaded
-      const bodyText = await page.textContent('body').catch(() => '') ?? '';
-      if (bodyText.includes('Followers') || bodyText.includes('Following')) {
-        // Profile loaded but no videos detected with selectors — might be DOM change
-        // Check if there are any visible images that look like video thumbnails
-        const imgCount = await page.locator('img').count();
-        if (imgCount > 3) {
-          // Profile has images (likely video thumbnails) — consider it verified
-          return { verified: true };
-        }
-      }
-      console.log(`[verify-tk] No videos found. URL: ${page.url()}`);
-      return { verified: false, error: 'No videos visible on profile' };
+    // Check if profile loaded at all
+    if (bodyText.includes('Followers') || bodyText.includes('Following')) {
+      console.log('[verify-tk] Profile loaded but no videos found');
+      return { verified: true, platformCount: 0, screenshotPath };
     }
 
-    // Found videos on the profile — that's sufficient for verification
-    return { verified: true };
+    return {
+      verified: false,
+      platformCount: 0,
+      error: 'Could not load TikTok profile or read video count',
+      screenshotPath,
+    };
   } finally {
     await context.close();
   }

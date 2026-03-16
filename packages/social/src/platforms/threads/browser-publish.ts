@@ -40,13 +40,19 @@ export async function browserPublishThreads(options: {
     ? `https://wordsleftunsent.com/messages/${messageId}`
     : 'https://wordsleftunsent.com');
 
-  // Use original message content, fall back to caption first line
-  const quote = options.messageContent
-    ? `"${options.messageContent.slice(0, 400)}"`
-    : options.caption.split('\n')[0].slice(0, 400);
+  // Threads has a 500-character limit. Build the text and truncate the quote if needed.
+  const THREADS_CHAR_LIMIT = 500;
   const header = options.messageTo ? `To ${options.messageTo},\n\n` : '';
   const attribution = options.messageFrom ? `\n\n— ${options.messageFrom}` : '';
-  const threadText = `${header}${quote}${attribution}\n\n${link}`;
+  const suffix = `${attribution}\n\n${link}`;
+  const overhead = header.length + suffix.length + 2; // +2 for quote marks
+  const maxQuoteLen = Math.max(80, THREADS_CHAR_LIMIT - overhead);
+
+  const rawQuote = options.messageContent ?? options.caption.split('\n')[0];
+  const truncatedQuote = rawQuote.length > maxQuoteLen
+    ? rawQuote.slice(0, maxQuoteLen - 3) + '...'
+    : rawQuote;
+  const threadText = `${header}"${truncatedQuote}"${suffix}`;
 
   if (options.dryRun) {
     console.log('[threads-publish] [DRY RUN] Would post:');
@@ -111,14 +117,43 @@ async function composeThread(page: Page, text: string): Promise<void> {
   await page.keyboard.type(text, { delay: 15 });
   await page.waitForTimeout(1000);
 
+  // Check character count — Threads shows a negative number when over-limit
+  const charCounter = page.locator('span').filter({ hasText: /^-\d+$/ }).first();
+  const isOverLimit = await charCounter.isVisible({ timeout: 1000 }).catch(() => false);
+  if (isOverLimit) {
+    const countText = await charCounter.textContent().catch(() => '');
+    await page.screenshot({ path: '/tmp/threads-over-limit.png' }).catch(() => {});
+    // Close the compose dialog
+    const cancelBtn = page.getByText('Cancel', { exact: true }).first();
+    await cancelBtn.click({ timeout: 3000 }).catch(() => {});
+    throw new Error(
+      `Thread text exceeds character limit (${countText} chars over). Screenshot: /tmp/threads-over-limit.png`,
+    );
+  }
+
   // Click Post button
   const postBtn = page
     .getByRole('button', { name: /^Post$/i })
-    .or(page.locator('[data-testid="post-button"]'))
     .first();
-  await postBtn.click({ timeout: 10000 });
+  const postFallback = page.locator('[data-testid="post-button"]').first();
+  const actualPostBtn = (await postBtn.isVisible({ timeout: 3000 }).catch(() => false))
+    ? postBtn
+    : postFallback;
+  await actualPostBtn.click({ timeout: 10000 });
 
   await page.waitForTimeout(5000);
   await page.screenshot({ path: '/tmp/threads-post-result.png' }).catch(() => {});
+
+  // Verify the compose dialog closed — if still open, the post failed
+  const composeStillOpen = await page
+    .locator('div[contenteditable="true"][role="textbox"]')
+    .first()
+    .isVisible({ timeout: 2000 })
+    .catch(() => false);
+  if (composeStillOpen) {
+    throw new Error(
+      'Thread may not have posted — compose dialog still open. Screenshot: /tmp/threads-post-result.png',
+    );
+  }
   console.log('[threads-publish] Thread posted');
 }

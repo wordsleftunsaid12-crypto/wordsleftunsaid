@@ -190,14 +190,18 @@ export async function unlikeMessage(messageId: string, visitorId: string): Promi
   return (count ?? 0) > 0;
 }
 
-export async function getUnapprovedMessages(): Promise<Message[]> {
+export async function getUnapprovedMessages(
+  filters: { limit?: number; offset?: number } = {},
+): Promise<Message[]> {
+  const { limit = DEFAULT_PAGE_SIZE, offset = 0 } = filters;
   const client = getServiceClient();
 
   const { data, error } = await client
     .from('messages')
     .select('*')
     .eq('approved', false)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1);
 
   if (error) throw new Error(`Failed to fetch unapproved messages: ${error.message}`);
   return data as Message[];

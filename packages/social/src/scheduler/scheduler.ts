@@ -1,4 +1,5 @@
 import { resolve } from 'node:path';
+import { unlinkSync, readlinkSync } from 'node:fs';
 import { jitteredInterval, INTERVALS } from './timing.js';
 import { scheduleCaptionedItems, getQueueStatus, catchUpMissedSlots } from './queue.js';
 import { captionPendingItems } from '../captions/generate.js';
@@ -160,6 +161,37 @@ async function runOutboundEngagement(options: { dryRun?: boolean }): Promise<voi
 }
 
 /**
+ * Remove stale SingletonLock symlinks from browser session directories.
+ * Chromium creates these locks to prevent concurrent profile access. If a
+ * browser process crashes or is killed, the lock file is left behind and
+ * blocks all future launches until removed.
+ */
+function cleanStaleLocks(): void {
+  for (const [platform, dir] of Object.entries(SESSION_DIRS)) {
+    const lockPath = resolve(dir, 'SingletonLock');
+    try {
+      const target = readlinkSync(lockPath);
+      // The lock is a symlink to "<hostname>-<pid>". Check if the PID is alive.
+      const pidMatch = target.match(/-(\d+)$/);
+      if (pidMatch) {
+        const pid = parseInt(pidMatch[1], 10);
+        try {
+          process.kill(pid, 0); // Signal 0 = check if alive
+          // Process is still alive — leave the lock
+          continue;
+        } catch {
+          // Process is dead — safe to remove
+        }
+      }
+      unlinkSync(lockPath);
+      console.log(`[scheduler] Removed stale lock: ${platform} (was ${target})`);
+    } catch {
+      // No lock file or not a symlink — nothing to clean
+    }
+  }
+}
+
+/**
  * Start the main scheduler loop. Runs all pipeline jobs on jittered intervals.
  * This is the long-running process started by `npm run schedule`.
  */
@@ -167,6 +199,10 @@ export async function startScheduler(options: SchedulerOptions = {}): Promise<vo
   const { dryRun = false, platform } = options;
 
   installTimestampLogger();
+
+  // Clean up stale SingletonLock files left by crashed browser sessions.
+  // These prevent Playwright from launching new persistent contexts.
+  cleanStaleLocks();
 
   console.log('[scheduler] Starting social media engine...');
   console.log(`[scheduler] Platforms: ${platform ?? 'ALL (' + ALL_PLATFORMS.join(', ') + ')'}`);

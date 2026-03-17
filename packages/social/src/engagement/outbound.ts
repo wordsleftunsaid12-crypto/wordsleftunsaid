@@ -108,8 +108,8 @@ export async function runOutboundSession(
     console.log(`[outbound] Navigating to #${targetHashtag}...`);
     await navigateToHashtag(page, targetHashtag);
 
-    const postLinks = page.locator('a[href*="/p/"]');
-    const postCount = await postLinks.count();
+    let postLinks = page.locator('a[href*="/p/"]');
+    let postCount = await postLinks.count();
 
     if (postCount === 0) {
       console.log('[outbound] No posts found — taking debug screenshot');
@@ -120,30 +120,38 @@ export async function runOutboundSession(
     console.log(`[outbound] Found ${postCount} posts`);
 
     // Engage with up to 8 unique posts per session
-    const maxToScan = Math.min(postCount, 15); // scan more to find 8 unique
     const targetUnique = 8;
     const likesToDo = Math.min(remaining.likes, targetUnique);
     const followsToDo = Math.min(remaining.follows, 2);
     const commentsToDo = Math.min(remaining.comments, 1);
     let uniqueVisited = 0;
+    let postIndex = 0; // Index into the CURRENT page's post list
 
-    for (let i = 0; i < maxToScan && uniqueVisited < targetUnique; i++) {
+    for (let scan = 0; scan < 15 && uniqueVisited < targetUnique; scan++) {
       try {
         // Navigate back to hashtag page before each post (except the first)
-        if (i > 0) {
+        if (scan > 0) {
           console.log(`[outbound] Navigating back to #${targetHashtag}...`);
           await navigateToHashtag(page, targetHashtag);
+          // Re-query post links — DOM is replaced after navigation
+          postLinks = page.locator('a[href*="/p/"]');
+          postCount = await postLinks.count();
+          if (postCount === 0) break;
         }
 
+        // Use postIndex to walk through posts sequentially on each fresh page load
+        if (postIndex >= postCount) break;
+
         // Get the href before clicking to check for duplicates
-        const href = await postLinks.nth(i).getAttribute('href', { timeout: 5000 }).catch(() => null);
+        const href = await postLinks.nth(postIndex).getAttribute('href', { timeout: 5000 }).catch(() => null);
+        postIndex++;
         if (href && visitedUrls.has(href)) {
           console.log(`[outbound] Skipping already-visited post ${href}`);
           continue;
         }
 
-        console.log(`[outbound] Opening post ${i + 1} (unique: ${uniqueVisited + 1}/${targetUnique})...`);
-        await postLinks.nth(i).click({ timeout: 10000 });
+        console.log(`[outbound] Opening post ${scan + 1} (unique: ${uniqueVisited + 1}/${targetUnique})...`);
+        await postLinks.nth(postIndex - 1).click({ timeout: 10000 });
         await page.waitForTimeout(1500);
 
         // Get post author
@@ -197,7 +205,7 @@ export async function runOutboundSession(
         }
 
         // --- Action 3: Follow (every 2nd-3rd post) ---
-        if (result.follows < followsToDo && i % 2 === 1) {
+        if (result.follows < followsToDo && uniqueVisited % 2 === 0) {
           console.log(`[outbound] Checking follow for @${username}...`);
           const followed = await followUser(page);
           if (followed) {
@@ -217,7 +225,7 @@ export async function runOutboundSession(
         }
 
         // --- Action 4: Leave a comment (first post only) ---
-        if (result.comments < commentsToDo && i === 0) {
+        if (result.comments < commentsToDo && uniqueVisited === 1) {
           console.log('[outbound] Writing a comment...');
           const commentText = options.generateComment
             ? await options.generateComment(await getPostDescription(page))
@@ -243,8 +251,8 @@ export async function runOutboundSession(
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        console.warn(`[outbound] Error on post ${i + 1}: ${msg.slice(0, 100)}`);
-        await page.screenshot({ path: `/tmp/ig-outbound-error-${i}.png` }).catch(() => {});
+        console.warn(`[outbound] Error on post ${scan + 1}: ${msg.slice(0, 100)}`);
+        await page.screenshot({ path: `/tmp/ig-outbound-error-${scan}.png` }).catch(() => {});
         result.errors++;
       }
     }

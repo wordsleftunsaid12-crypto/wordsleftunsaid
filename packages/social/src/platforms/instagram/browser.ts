@@ -40,9 +40,15 @@ export async function launchInstagram(): Promise<BrowserSession> {
   });
   await page.waitForTimeout(5000);
 
-  // Verify logged in
-  const hasHome = await page.locator('svg[aria-label="Home"]').count();
-  if (hasHome === 0) {
+  // Verify logged in — check multiple indicators since IG's DOM varies
+  const loggedIn = await Promise.any([
+    page.locator('svg[aria-label="Home"]').first().waitFor({ timeout: 8000 }).then(() => true),
+    page.locator('svg[aria-label="New post"]').first().waitFor({ timeout: 8000 }).then(() => true),
+    page.locator('svg[aria-label="Search"]').first().waitFor({ timeout: 8000 }).then(() => true),
+    page.locator('a[href*="/direct/"]').first().waitFor({ timeout: 8000 }).then(() => true),
+  ]).catch(() => false);
+
+  if (!loggedIn) {
     await context.close();
     throw new Error(
       'Not logged in to Instagram. Run the login flow first (npx tsx packages/social/src/index.ts login).',

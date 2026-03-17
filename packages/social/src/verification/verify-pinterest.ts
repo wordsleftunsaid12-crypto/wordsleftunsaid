@@ -28,23 +28,39 @@ export async function verifyPinterestPost(post: Post): Promise<VerificationResul
     });
     await page.waitForTimeout(5000);
 
-    // Verify we're on a profile page, not the home feed or error page
-    const currentUrl = page.url();
-    const isProfilePage =
-      currentUrl.includes(`pinterest.com/${PINTEREST_USERNAME}`) &&
-      !currentUrl.includes('show_error') &&
-      !currentUrl.includes('login');
-
     const screenshotPath = '/tmp/verify-pinterest-profile.png';
     await page.screenshot({ path: screenshotPath }).catch(() => {});
 
+    // Verify we're on a profile page, not the home feed or login page
+    const currentUrl = page.url();
+    const isLoginPage = currentUrl.includes('/login');
+
+    // Check page content for profile indicators (more reliable than URL alone,
+    // since Pinterest sometimes appends ?show_error=true even on valid profiles)
+    const bodyText = await page.textContent('body').catch(() => '') ?? '';
+    const hasProfileContent = bodyText.includes('followers') ||
+      bodyText.includes('Unsent Letters') ||
+      bodyText.includes('Created');
+
+    if (isLoginPage) {
+      console.warn('[verify-pinterest] Redirected to login page');
+      return {
+        verified: false,
+        platformCount: 0,
+        error: 'Redirected to login page',
+        screenshotPath,
+      };
+    }
+
+    const isProfilePage =
+      currentUrl.includes(`pinterest.com/${PINTEREST_USERNAME}`) || hasProfileContent;
+
     if (!isProfilePage) {
-      // We got redirected to the home feed — username may be wrong
       console.warn(`[verify-pinterest] Redirected to ${currentUrl} — not a profile page`);
       return {
         verified: false,
         platformCount: 0,
-        error: `Redirected to home feed instead of profile (${currentUrl})`,
+        error: `Redirected away from profile (${currentUrl})`,
         screenshotPath,
       };
     }

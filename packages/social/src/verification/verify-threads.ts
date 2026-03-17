@@ -37,26 +37,39 @@ export async function verifyThreadsPost(post: Post): Promise<VerificationResult>
     const screenshotPath = '/tmp/verify-threads-profile.png';
     await page.screenshot({ path: screenshotPath }).catch(() => {});
 
-    // Strategy: Count elements that show our username "u.wordsleftunsent" as post authors.
+    // Detect 404 / page-not-found
+    const bodyText = await page.textContent('body').catch(() => '') ?? '';
+    if (bodyText.includes('Not all who wander') || bodyText.includes("page is gone")) {
+      console.log('[verify-threads] Profile returned 404 — page not found');
+      return {
+        verified: false,
+        platformCount: -1, // Signal: blocked/unavailable, skip
+        error: 'Threads profile returned 404 — may be temporarily unavailable',
+        screenshotPath,
+      };
+    }
+
+    // Strategy: Count elements that show our username as post authors.
     // Each thread on the profile has a link/span with the username and a relative timestamp.
     // The profile header also shows the username once, so subtract 1 if count > 0.
+    const username = 'u.wordsleftunsent';
 
     // Count all links/spans containing our exact username within the feed area
-    const usernameElements = page.locator('a, span').filter({ hasText: 'u.wordsleftunsent' });
+    const usernameElements = page.locator('a, span').filter({ hasText: username });
     const usernameCount = await usernameElements.count();
 
-    // Also count relative time indicators (1h, 2d, 5m, etc.) which appear per-post
-    const timePatternCount = await page.evaluate(() => {
+    // Also count via regex on body text
+    const textMatchCount = await page.evaluate((uname: string) => {
       const allText = document.body.innerText;
-      // Match timestamps like "5h", "2d", "1w", "3m" that appear after usernames
-      const matches = allText.match(/\bu\.wordsleftunsent\b/g);
+      const regex = new RegExp(`\\b${uname.replace('.', '\\.')}\\b`, 'g');
+      const matches = allText.match(regex);
       return matches ? matches.length : 0;
-    });
+    }, username);
 
     // The username appears once in the profile header + once per thread post.
     // So posts = max(0, occurrences - 1) (subtract profile header)
-    const headerOccurrences = 1; // Profile header always shows username once
-    const postCount = Math.max(0, Math.max(usernameCount, timePatternCount) - headerOccurrences);
+    const headerOccurrences = 1;
+    const postCount = Math.max(0, Math.max(usernameCount, textMatchCount) - headerOccurrences);
 
     if (postCount > 0) {
       console.log(`[verify-threads] Found ${postCount} thread(s) on profile`);
@@ -64,7 +77,6 @@ export async function verifyThreadsPost(post: Post): Promise<VerificationResult>
     }
 
     // Fallback: check if profile loaded at all
-    const bodyText = await page.textContent('body').catch(() => '') ?? '';
     if (bodyText.includes('followers') || bodyText.includes('Threads')) {
       console.log('[verify-threads] Profile loaded but no threads found');
       return { verified: true, platformCount: 0, screenshotPath };

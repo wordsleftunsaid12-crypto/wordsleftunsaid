@@ -136,13 +136,16 @@ async function extractTikTokCounts(page: Page): Promise<FollowerCounts> {
 export async function scrapeYouTubeSubscriberCount(
   channelHandle = '@WordsLeftUnsent',
 ): Promise<FollowerCounts> {
-  const { context, page } = await launchYouTube();
+  const { context } = await launchYouTube();
   try {
+    // Open a fresh page for the public channel — Studio may have consumed or
+    // redirected the original page, causing "Target page has been closed" errors.
+    const channelPage = await context.newPage();
     const channelUrl = `https://www.youtube.com/${channelHandle}`;
     console.log(`[followers] Navigating to ${channelUrl}`);
-    await page.goto(channelUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await page.waitForTimeout(3000);
-    return await extractYouTubeCounts(page);
+    await channelPage.goto(channelUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await channelPage.waitForTimeout(3000);
+    return await extractYouTubeCounts(channelPage);
   } finally {
     await context.close();
   }

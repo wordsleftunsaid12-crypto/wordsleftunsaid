@@ -86,6 +86,7 @@ export {
 
 // Utils
 export { BRAND, MAX_VIDEO_CONTENT_LENGTH } from './utils/brand.js';
+export { withRetry } from './utils/retry.js';
 export { sanitizeText, sanitizeMessageInput } from './utils/sanitize.js';
 export { moderateContent } from './utils/moderate.js';
 export type { ModerationResult } from './utils/moderate.js';

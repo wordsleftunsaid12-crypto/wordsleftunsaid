@@ -42,6 +42,22 @@ export async function verifyTikTokPost(post: Post): Promise<VerificationResult> 
     const screenshotPath = '/tmp/verify-tiktok-profile.png';
     await page.screenshot({ path: screenshotPath }).catch(() => {});
 
+    // Detect CAPTCHA / security puzzle that blocks profile access
+    const bodyHtml = await page.textContent('body').catch(() => '') ?? '';
+    const hasCaptcha =
+      bodyHtml.includes('Drag the slider') ||
+      bodyHtml.includes('fit the puzzle') ||
+      bodyHtml.includes('Verify to continue');
+    if (hasCaptcha) {
+      console.warn('[verify-tk] CAPTCHA detected — cannot verify, skipping');
+      return {
+        verified: false,
+        platformCount: -1, // Signal: blocked, not a real count
+        error: 'CAPTCHA blocked profile access — skipping verification',
+        screenshotPath,
+      };
+    }
+
     // Read the body text to find video count
     // TikTok profiles show: "X Following  Y Followers  Z Likes" and video count near tabs
     const bodyText = await page.textContent('body').catch(() => '') ?? '';

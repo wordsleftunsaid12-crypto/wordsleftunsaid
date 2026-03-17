@@ -137,6 +137,24 @@ export async function verifyRecentPosts(): Promise<{
         ? withBrowserLock(sessionDir, doVerify)
         : doVerify());
 
+      // platformCount === -1 means the verifier was blocked (e.g. CAPTCHA)
+      // In that case, skip this platform entirely — don't mark posts as failed
+      if (platformCount < 0) {
+        console.warn(
+          `[verify] ${platform} — SKIPPED (blocked by CAPTCHA or anti-bot)`,
+        );
+        results.push({
+          platform,
+          dbCount,
+          platformCount: 0,
+          match: false,
+          screenshotPath,
+          error: 'Blocked by CAPTCHA — skipped',
+        });
+        skipped++;
+        continue;
+      }
+
       const match = platformCount >= dbCount;
       const result: PlatformVerifyResult = {
         platform,

@@ -20,7 +20,7 @@ export async function verifyPinterestPost(post: Post): Promise<VerificationResul
   const { context, page } = await launchPinterest();
 
   try {
-    const profileUrl = `https://www.pinterest.com/${PINTEREST_USERNAME}/_created/`;
+    const profileUrl = `https://www.pinterest.com/${PINTEREST_USERNAME}/`;
     console.log(`[verify-pinterest] Navigating to: ${profileUrl}`);
     await page.goto(profileUrl, {
       waitUntil: 'domcontentloaded',
@@ -28,9 +28,12 @@ export async function verifyPinterestPost(post: Post): Promise<VerificationResul
     });
     await page.waitForTimeout(5000);
 
-    // Verify we're on a profile page, not the home feed
+    // Verify we're on a profile page, not the home feed or error page
     const currentUrl = page.url();
-    const isProfilePage = currentUrl.includes('/_created') || currentUrl.includes('/_saved');
+    const isProfilePage =
+      currentUrl.includes(`pinterest.com/${PINTEREST_USERNAME}`) &&
+      !currentUrl.includes('show_error') &&
+      !currentUrl.includes('login');
 
     const screenshotPath = '/tmp/verify-pinterest-profile.png';
     await page.screenshot({ path: screenshotPath }).catch(() => {});

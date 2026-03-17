@@ -5,6 +5,7 @@ import {
   hasPostForMessages,
   hasQueueItemForMessages,
   getMessageById,
+  MAX_VIDEO_CONTENT_LENGTH,
 } from '@wlu/shared';
 import type { Message, Platform } from '@wlu/shared';
 import { browserPublishReel } from '../platforms/instagram/browser-publish.js';
@@ -62,6 +63,17 @@ export async function publishNextScheduled(
     let sourceMessage: Message | null = null;
     if (item.messageIds?.length) {
       sourceMessage = await getMessageById(item.messageIds[0]);
+    }
+
+    // Guard: reject items with message content too long for the video frame
+    if (sourceMessage && sourceMessage.content.length > MAX_VIDEO_CONTENT_LENGTH) {
+      console.warn(
+        `[publish-job] Message too long (${sourceMessage.content.length} > ${MAX_VIDEO_CONTENT_LENGTH} chars), marking as failed: ${item.id}`,
+      );
+      await updateContentQueueStatus(item.id, 'failed', {
+        errorMessage: `Message content too long (${sourceMessage.content.length} chars, max ${MAX_VIDEO_CONTENT_LENGTH})`,
+      });
+      return false;
     }
 
     // For TikTok, ensure posts always have discovery hashtags

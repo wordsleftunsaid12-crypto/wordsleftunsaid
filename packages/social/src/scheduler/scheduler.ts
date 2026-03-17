@@ -9,7 +9,7 @@ import { collectFollowerSnapshot } from '../collectors/followers.js';
 import { seedDailyMessages } from '../content/message-seeder.js';
 import { saveLastRun, getSecondsSinceLastRun, installTimestampLogger } from './state.js';
 import { withBrowserLock } from '../platforms/browser-lock.js';
-import { getContentQueue } from '@wlu/shared';
+import { getContentQueue, withRetry } from '@wlu/shared';
 
 /** All supported platforms for publishing. */
 const ALL_PLATFORMS = [
@@ -360,10 +360,10 @@ export async function startScheduler(options: SchedulerOptions = {}): Promise<vo
       continue;
     }
     try {
-      await job.fn();
+      await withRetry<unknown>(() => job.fn(), { maxRetries: 2, baseDelayMs: 3000, label: job.name });
       saveLastRun(job.name);
     } catch (err) {
-      console.error(`[scheduler] Initial ${job.name} failed:`, err);
+      console.error(`[scheduler] Initial ${job.name} failed:`, err instanceof Error ? err.message : err);
     }
   }
 
@@ -416,10 +416,10 @@ async function runJobLoop(
     if (signal.aborted) break;
 
     try {
-      await fn();
+      await withRetry(() => fn(), { maxRetries: 2, baseDelayMs: 3000, label: name });
       saveLastRun(name);
     } catch (err) {
-      console.error(`[scheduler] ${name} error:`, err);
+      console.error(`[scheduler] ${name} error:`, err instanceof Error ? err.message : err);
     }
   }
 }

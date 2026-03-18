@@ -15,7 +15,7 @@ const PLATFORM_DEFAULTS: Record<Platform, number[]> = {
   reddit: [8, 18],
   pinterest: [20, 21],
   twitter: [8, 12, 17],
-  threads: [7, 12, 19],
+  threads: [7, 9, 12, 15, 19, 21],
 };
 
 /** Default timezone when no config exists. */

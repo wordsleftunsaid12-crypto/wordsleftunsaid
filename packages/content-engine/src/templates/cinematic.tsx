@@ -14,6 +14,8 @@ export interface CinematicProps {
   to: string;
   content: string;
   backgroundVideo: string;
+  ctaLine1?: string;
+  ctaLine2?: string;
 }
 
 export const CinematicMessage: React.FC<CinematicProps> = ({
@@ -21,6 +23,8 @@ export const CinematicMessage: React.FC<CinematicProps> = ({
   to,
   content,
   backgroundVideo,
+  ctaLine1,
+  ctaLine2,
 }) => {
   const frame = useCurrentFrame();
   const { height, durationInFrames } = useVideoConfig();
@@ -367,7 +371,7 @@ export const CinematicMessage: React.FC<CinematicProps> = ({
             textShadow: '0 2px 20px rgba(0, 0, 0, 0.8)',
           }}
         >
-          Share your unsent message
+          {ctaLine1 ?? 'Share your unsent message'}
         </div>
         <div
           style={{
@@ -380,7 +384,7 @@ export const CinematicMessage: React.FC<CinematicProps> = ({
             textShadow: '0 2px 20px rgba(0, 0, 0, 0.8)',
           }}
         >
-          wordsleftunsent.com
+          {ctaLine2 ?? 'wordsleftunsent.com'}
         </div>
       </div>
     </AbsoluteFill>

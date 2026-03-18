@@ -2,7 +2,7 @@ import type { Page } from 'playwright';
 import { createPost, getPostCountToday, updateContentQueueStatus } from '@wlu/shared';
 import { launchThreads } from './browser.js';
 
-const MAX_POSTS_PER_DAY = 3;
+const MAX_POSTS_PER_DAY = 6;
 
 interface ThreadsPublishResult {
   postId: string;
@@ -96,7 +96,7 @@ export async function browserPublishThreads(options: {
 /**
  * Compose and post a thread via Threads' web UI.
  */
-async function composeThread(page: Page, text: string): Promise<void> {
+export async function composeThread(page: Page, text: string): Promise<void> {
   // Click the create/compose button
   const createBtn = page
     .locator('[aria-label="Create"], [aria-label="New thread"], svg[aria-label="Create"]')

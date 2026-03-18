@@ -42,6 +42,7 @@ export {
   searchMessages,
   likeMessage,
   unlikeMessage,
+  markFirstLikeNotified,
 } from './db/messages.js';
 
 // Database — Content Queue
@@ -90,7 +91,7 @@ export { withRetry } from './utils/retry.js';
 export { sanitizeText, sanitizeMessageInput } from './utils/sanitize.js';
 export { moderateContent } from './utils/moderate.js';
 export type { ModerationResult } from './utils/moderate.js';
-export { notifyMessageApproved } from './utils/notify.js';
+export { notifyMessageApproved, notifyFirstLike, notifyMessageBecameVideo } from './utils/notify.js';
 
 // Config
 export { getEnv, getEnvSafe } from './config/env.js';

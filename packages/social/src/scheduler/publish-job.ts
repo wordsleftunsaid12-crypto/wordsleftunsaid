@@ -13,7 +13,7 @@ import { buildUtmUrl } from '../utils/utm.js';
 
 /** Platforms to auto-cross-post to after a successful publish. */
 const CROSS_POST_TARGETS: Record<string, string[]> = {
-  instagram: ['tiktok', 'youtube', 'reddit', 'pinterest', 'twitter', 'threads'],
+  instagram: ['tiktok', 'reddit', 'pinterest', 'twitter', 'threads'],
   tiktok: [],
   youtube: [],
   reddit: [],
@@ -82,7 +82,12 @@ export async function publishNextScheduled(
       hashtagString = TIKTOK_DEFAULT_HASHTAGS.join(' ');
     }
 
-    const rawCaption = `${item.caption ?? ''}\n\n${hashtagString}`.trim();
+    let rawCaption = `${item.caption ?? ''}\n\n${hashtagString}`.trim();
+
+    // YouTube: append subscribe CTA to description
+    if (platform === 'youtube') {
+      rawCaption += '\n\nSubscribe for more unsent letters \u2764\uFE0F';
+    }
 
     // Build UTM-tracked URL for text platforms that include links
     const messageId = item.messageIds?.[0];

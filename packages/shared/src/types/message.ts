@@ -8,6 +8,7 @@ export interface Message {
   created_at: string;
   like_count: number;
   seeded: boolean;
+  first_like_notified: boolean;
 }
 
 export interface CreateMessageInput {

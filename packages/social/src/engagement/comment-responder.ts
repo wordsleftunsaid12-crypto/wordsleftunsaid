@@ -55,39 +55,62 @@ function createTemplateReplyGenerator(): (
   username: string,
   postCaption: string | null,
 ) => Promise<string> {
-  const empathyReplies = [
-    'Thank you for sharing this. Your words carry so much weight.',
-    'This really resonates. Sometimes the things we leave unsent say the most.',
-    'We hear you. These feelings deserve to be expressed.',
-    'Thank you for being here and for your honesty.',
-    'Your vulnerability means more than you know.',
+  // Replies that acknowledge + ask a follow-up + subtly invite submission
+  const emotionalReplies = [
+    'That must weigh heavy. Have you ever written your own unsent message? There\'s something powerful about letting those words out.',
+    'I felt that. What\'s the message you\'ve been holding back? Sometimes writing it changes everything.',
+    'This resonates deeply. What would you say if no one would ever know it was you?',
+    'Your words carry so much weight. Have you ever let yourself write out what you\'re carrying?',
+    'I hear you. What\'s the one thing you wish you could say without consequences?',
+  ];
+
+  const shortCommentReplies = [
+    'What would yours say?',
+    'Have you ever held back words you wish you\'d said?',
+    'What\'s the message you\'ll never send?',
   ];
 
   const questionReplies = [
-    'You can share your own message anonymously at wordsleftunsent.com',
-    'We\'d love to hear your story — you can submit yours at wordsleftunsent.com',
+    'Great question! There\'s a space in our bio where you can write yours anonymously.',
+    'So glad you asked. Check the link in our bio \u2014 it\'s a safe space to write what you can\'t say out loud.',
   ];
 
   const tagReplies = [
-    'So glad you\'re sharing this with someone who matters.',
-    'Some messages are meant to be shared. Thank you for this.',
+    'Love that you\'re sharing this. What would you say to them if they\'d never know?',
+    'The fact that you thought of someone says everything. What would your unsent message say?',
+  ];
+
+  const agreementReplies = [
+    'Right? Some words are heavier when they stay inside. What\'s yours?',
+    'Exactly. The unsent ones hit different. What message are you still carrying?',
   ];
 
   return async (commentText: string, _username: string) => {
     const lower = commentText.toLowerCase();
+    const wordCount = commentText.split(/\s+/).length;
 
-    // If they ask a question
-    if (lower.includes('?') || lower.includes('how') || lower.includes('where')) {
+    // Very short comments (emoji reactions, single words)
+    if (wordCount <= 3) {
+      return shortCommentReplies[Math.floor(Math.random() * shortCommentReplies.length)];
+    }
+
+    // Questions from the commenter
+    if (lower.includes('?') || lower.includes('how do') || lower.includes('where can')) {
       return questionReplies[Math.floor(Math.random() * questionReplies.length)];
     }
 
-    // If they tag someone
+    // Tagged someone
     if (commentText.includes('@')) {
       return tagReplies[Math.floor(Math.random() * tagReplies.length)];
     }
 
-    // Default empathetic response
-    return empathyReplies[Math.floor(Math.random() * empathyReplies.length)];
+    // Agreement/affirmation comments
+    if (/\b(so true|this|fr|facts|felt that|real|same|mood|literally)\b/.test(lower)) {
+      return agreementReplies[Math.floor(Math.random() * agreementReplies.length)];
+    }
+
+    // Default: emotional acknowledgment + follow-up question
+    return emotionalReplies[Math.floor(Math.random() * emotionalReplies.length)];
   };
 }
 

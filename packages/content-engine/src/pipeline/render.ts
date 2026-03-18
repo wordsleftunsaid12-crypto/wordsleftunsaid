@@ -16,7 +16,8 @@ export type CompositionId =
   | 'ModernVertical'
   | 'ModernSquare'
   | 'CinematicVertical'
-  | 'CinematicSquare';
+  | 'CinematicSquare'
+  | 'POVVertical';
 
 export interface RenderOptions {
   compositionId: CompositionId;
@@ -25,6 +26,8 @@ export interface RenderOptions {
     to: string;
     content: string;
     backgroundVideo?: string;
+    ctaLine1?: string;
+    ctaLine2?: string;
   };
   outputPath: string;
 }

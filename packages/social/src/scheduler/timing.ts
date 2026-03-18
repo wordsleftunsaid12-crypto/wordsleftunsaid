@@ -28,11 +28,12 @@ export const INTERVALS = {
   SCHEDULE: 60 * 60000,       // 60 min base → 42-78 min
   PUBLISH: 5 * 60000,         // 5 min base → 3.5-6.5 min
   COMMENT_REPLY: 6 * 3600000, // 6 hours base → ~4x/day (low engagement phase)
-  OUTBOUND: 3 * 3600000,      // 3 hours base → ~8x/day (one random platform each)
+  OUTBOUND: 6 * 3600000,      // 6 hours base → ~4x/day (reduced after IG flagging)
   RENDER: 4 * 3600000,        // 4 hours base → 2.8-5.2 hours with jitter
   METRICS: 12 * 3600000,      // 12 hours base → twice daily with jitter
   LEARN: 24 * 3600000,        // 24 hours (once daily)
   VERIFY: 4 * 3600000,        // 4 hours base → ~6x/day (low engagement phase)
   DAILY_SUMMARY: 24 * 3600000, // 24 hours (once daily)
   UNFOLLOW: 24 * 3600000,      // 24 hours (once daily)
+  THREADS_TEXT: 4 * 3600000,   // 4 hours → ~6 standalone text threads/day
 } as const;

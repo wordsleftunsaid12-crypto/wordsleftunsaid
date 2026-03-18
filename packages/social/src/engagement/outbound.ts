@@ -12,10 +12,10 @@ import { launchInstagram, navigateToHashtag } from '../platforms/instagram/brows
  * Intentionally very conservative to minimize ban risk.
  */
 const LIMITS = {
-  maxLikesPerDay: 15,
-  maxFollowsPerDay: 5,
-  maxCommentsPerDay: 3,
-  minDelayBetweenActions: 5000, // 5 seconds between actions (was 15s — too slow)
+  maxLikesPerDay: 6,
+  maxFollowsPerDay: 2,
+  maxCommentsPerDay: 1,
+  minDelayBetweenActions: 12000, // 12 seconds between actions (was 5s — too fast, triggered flag)
 } as const;
 
 /** Our own account usernames — skip these during outbound engagement */

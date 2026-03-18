@@ -20,8 +20,6 @@ const OWN_ACCOUNTS = ['UnsaidWords', 'Proud-Minute4849', 'wordsleftunsent'];
 
 /** Subreddits to engage in — related communities. */
 const TARGET_SUBREDDITS = [
-  'UnsentLetters',
-  'unsentletters',
   'offmychest',
   'TrueOffMyChest',
   'letters',

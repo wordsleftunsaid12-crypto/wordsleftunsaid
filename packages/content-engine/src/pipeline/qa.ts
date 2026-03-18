@@ -203,6 +203,9 @@ function runMetadataChecks(metadata: VideoMetadata, template: string): QACheck[]
   const isVertical = template.includes('Vertical');
   const expectedWidth = 1080;
   const expectedHeight = isVertical ? 1920 : 1080;
+  // Text-only templates (POV) are lighter than cinematic (no background video)
+  const minFileSize = template.startsWith('POV') ? 500_000 : 1_000_000;
+  const minLabel = template.startsWith('POV') ? '0.5MB' : '1MB';
 
   return [
     {
@@ -225,8 +228,8 @@ function runMetadataChecks(metadata: VideoMetadata, template: string): QACheck[]
     },
     {
       name: 'fileSize',
-      passed: metadata.fileSizeBytes >= 1_000_000 && metadata.fileSizeBytes <= 100_000_000,
-      expected: '1MB-100MB',
+      passed: metadata.fileSizeBytes >= minFileSize && metadata.fileSizeBytes <= 100_000_000,
+      expected: `${minLabel}-100MB`,
       actual: `${(metadata.fileSizeBytes / 1_000_000).toFixed(1)}MB`,
     },
     {

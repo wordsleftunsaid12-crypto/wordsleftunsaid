@@ -4,6 +4,7 @@ import { ClassicMessage } from '../templates/classic';
 import { ModernMessage } from '../templates/modern';
 import { CinematicMessage } from '../templates/cinematic';
 import type { CinematicProps } from '../templates/cinematic';
+import { POVMessage } from '../templates/pov';
 
 export type MessageProps = {
   from: string;
@@ -52,6 +53,16 @@ export const RemotionRoot: React.FC = () => {
         width={1080}
         height={1920}
         defaultProps={cinematicProps}
+      />
+
+      <Composition
+        id="POVVertical"
+        component={POVMessage}
+        durationInFrames={240}
+        fps={30}
+        width={1080}
+        height={1920}
+        defaultProps={commonProps}
       />
 
       {/* Square (Feed posts) */}

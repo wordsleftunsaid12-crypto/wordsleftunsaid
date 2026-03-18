@@ -14,6 +14,7 @@ import {
   getUsedMessageIds,
   createApprovedMessage,
   MAX_VIDEO_CONTENT_LENGTH,
+  notifyMessageBecameVideo,
 } from '@wlu/shared';
 import { MESSAGE_POOL } from './message-seeder.js';
 
@@ -116,11 +117,14 @@ export async function renderNextContent(options: {
       return result;
     }
 
-    // Step 2: Render videos via content-engine CLI
-    console.log(`[auto-render] Rendering ${count} videos...`);
+    // Snapshot used IDs before rendering (to detect newly-rendered UGC messages)
+    const usedIdsBefore = new Set(await getUsedMessageIds());
+
+    // Step 2: Render videos via content-engine CLI (auto-selects template)
+    console.log(`[auto-render] Rendering ${count} videos for Instagram...`);
     const renderResult = await execFileAsync(
       'npx',
-      ['tsx', 'packages/content-engine/src/index.ts', 'render-next', 'CinematicVertical', String(count)],
+      ['tsx', 'packages/content-engine/src/index.ts', 'render-next', 'auto', String(count)],
       {
         cwd: PROJECT_ROOT,
         env: { ...process.env, PATH: `/opt/homebrew/bin:${process.env.PATH}` },
@@ -129,9 +133,30 @@ export async function renderNextContent(options: {
     );
 
     // Count rendered videos from output
-    const renderedCount = (renderResult.stdout.match(/Queued with message ID tracked/g) ?? []).length;
+    let renderedCount = (renderResult.stdout.match(/Queued with message ID tracked/g) ?? []).length;
+    console.log(`[auto-render] Rendered ${renderedCount} IG video(s)`);
+
+    // Step 2b: Render 1 video for YouTube with subscribe CTA
+    try {
+      console.log('[auto-render] Rendering 1 video for YouTube (subscribe CTA)...');
+      const ytResult = await execFileAsync(
+        'npx',
+        ['tsx', 'packages/content-engine/src/index.ts', 'render-next', 'CinematicVertical', '1', 'youtube'],
+        {
+          cwd: PROJECT_ROOT,
+          env: { ...process.env, PATH: `/opt/homebrew/bin:${process.env.PATH}` },
+          timeout: 10 * 60 * 1000,
+        },
+      );
+      const ytRendered = (ytResult.stdout.match(/Queued with message ID tracked/g) ?? []).length;
+      renderedCount += ytRendered;
+      console.log(`[auto-render] Rendered ${ytRendered} YouTube video(s)`);
+    } catch (err) {
+      console.warn('[auto-render] YouTube render failed:', err instanceof Error ? err.message : String(err));
+    }
+
     result.rendered = renderedCount;
-    console.log(`[auto-render] Rendered ${renderedCount} video(s)`);
+    console.log(`[auto-render] Total rendered: ${renderedCount} video(s)`);
 
     if (renderResult.stderr) {
       console.warn('[auto-render] Render stderr:', renderResult.stderr.slice(0, 200));
@@ -161,6 +186,30 @@ export async function renderNextContent(options: {
 
     if (qaResult.stderr) {
       console.warn('[auto-render] QA stderr:', qaResult.stderr.slice(0, 200));
+    }
+
+    // Step 4: Notify UGC submitters that their message became a video
+    try {
+      const usedIdsAfter = await getUsedMessageIds();
+      const newlyUsed = usedIdsAfter.filter((id) => !usedIdsBefore.has(id));
+      if (newlyUsed.length > 0) {
+        const allMessages = await getApprovedMessages({ limit: 200 });
+        const messageMap = new Map(allMessages.map((m) => [m.id, m]));
+        for (const id of newlyUsed) {
+          const msg = messageMap.get(id);
+          if (msg && msg.email && !msg.seeded) {
+            await notifyMessageBecameVideo({
+              messageId: msg.id,
+              email: msg.email,
+              to: msg.to,
+              siteUrl: 'https://wordsleftunsent.com',
+            }).catch(() => {});
+            console.log(`[auto-render] Notified ${msg.email} that their message became a video`);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[auto-render] UGC notification failed:', err instanceof Error ? err.message : err);
     }
   } catch (err) {
     result.errors++;

@@ -46,7 +46,7 @@ const TEMPLATES: CaptionTemplate[] = [
   {
     hook: 'Some feelings don\u2019t have an audience. Until now.',
     body: 'An anonymous space for the words you\u2019ve been holding onto. No judgment. No names.',
-    question: 'Tag someone who needs to see this.',
+    question: 'Who would you write your unsent message to?',
     cta: `Let it out \u2192 ${CTA_LINK}`,
     moods: ['raw', 'regretful', 'tender'],
   },
@@ -60,14 +60,14 @@ const TEMPLATES: CaptionTemplate[] = [
   {
     hook: 'This stopped me mid-scroll.',
     body: 'Real words from a real person who couldn\u2019t say them out loud. The courage in vulnerability is everything.',
-    question: 'Drop a \u2764\uFE0F if this hit you.',
+    question: 'What\u2019s the one thing you never got to tell them?',
     cta: `Read more \u2192 ${CTA_LINK}`,
     moods: ['bittersweet', 'tender', 'hopeful'],
   },
   {
     hook: 'If you could send one anonymous message to anyone, what would it say?',
     body: 'No names. No judgment. Just the truth you\u2019ve been carrying.',
-    question: 'Tell us in the comments \u2193',
+    question: 'What would YOUR unsent message say? Tell us below \u2193',
     cta: `Share it here \u2192 ${CTA_LINK}`,
     moods: ['bittersweet', 'raw', 'regretful', 'tender', 'hopeful'],
   },
@@ -88,14 +88,14 @@ const TEMPLATES: CaptionTemplate[] = [
   {
     hook: 'Healing starts with honesty \u2014 even the silent kind.',
     body: 'This message was written anonymously by someone who needed to let go. What are you holding onto?',
-    question: 'Save this for when you need it.',
+    question: 'What are you holding onto that you need to let go of?',
     cta: `Share anonymously \u2192 ${CTA_LINK}`,
     moods: ['hopeful', 'tender'],
   },
   {
     hook: 'I wonder how many of us are carrying the same unsent words.',
     body: 'There\u2019s something about reading someone else\u2019s truth that makes your own feel less alone.',
-    question: 'Send this to someone who gets it.',
+    question: 'What words are you still carrying?',
     cta: `Read or write \u2192 ${CTA_LINK}`,
     moods: ['bittersweet', 'tender'],
   },
@@ -123,14 +123,14 @@ const TEMPLATES: CaptionTemplate[] = [
   {
     hook: 'This hit different.',
     body: 'An anonymous message from someone brave enough to say what most of us only think.',
-    question: 'Drop a \u2764\uFE0F if this got you.',
+    question: 'What\u2019s the hardest thing you never said out loud?',
     cta: `More at ${CTA_LINK}`,
     moods: ['raw', 'bittersweet'],
   },
   {
     hook: 'The things we don\u2019t say out loud often say the most.',
     body: 'Words Left Unsent is a place for the feelings that deserve to be heard, even anonymously.',
-    question: 'Tag someone who\u2019d relate.',
+    question: 'Who came to mind when you read this?',
     cta: `Share yours \u2192 ${CTA_LINK}`,
     moods: ['tender', 'hopeful', 'bittersweet'],
   },
@@ -208,6 +208,15 @@ const HASHTAG_SETS: Record<'instagram' | 'tiktok' | 'youtube', string[]> = {
   ],
 };
 
+/** TikTok-specific trending hooks to prepend to captions */
+const TIKTOK_HOOKS = [
+  'POV: you finally write the message you\u2019ve been composing in your head',
+  'Things I never said:',
+  'POV: the words you never sent finally get heard',
+  'The message I\u2019ll never send:',
+  'Words I\u2019m still carrying:',
+];
+
 /**
  * Build a full caption with mood-matched template + platform hashtags.
  */
@@ -215,7 +224,14 @@ export function buildCaption(
   mood: MessageMood,
   platform: 'instagram' | 'tiktok' | 'youtube',
 ): { caption: string; hashtags: string[] } {
-  const caption = pickCaptionTemplate(mood);
+  let caption = pickCaptionTemplate(mood);
+
+  // TikTok: prepend a trending hook format for discovery
+  if (platform === 'tiktok') {
+    const hook = TIKTOK_HOOKS[Math.floor(Math.random() * TIKTOK_HOOKS.length)];
+    caption = `${hook}\n\n${caption}`;
+  }
+
   const hashtags = HASHTAG_SETS[platform];
   return { caption, hashtags };
 }

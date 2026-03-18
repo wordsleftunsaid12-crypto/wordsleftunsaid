@@ -87,6 +87,7 @@ export async function createMessage(input: CreateMessageInput): Promise<Message>
     created_at: new Date().toISOString(),
     like_count: 0,
     seeded: false,
+    first_like_notified: false,
   };
 }
 
@@ -188,6 +189,17 @@ export async function unlikeMessage(messageId: string, visitorId: string): Promi
 
   if (error) throw new Error(`Failed to unlike message: ${error.message}`);
   return (count ?? 0) > 0;
+}
+
+export async function markFirstLikeNotified(messageId: string): Promise<void> {
+  const client = getServiceClient();
+
+  const { error } = await client
+    .from('messages')
+    .update({ first_like_notified: true })
+    .eq('id', messageId);
+
+  if (error) throw new Error(`Failed to mark first_like_notified: ${error.message}`);
 }
 
 export async function getUnapprovedMessages(

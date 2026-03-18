@@ -168,7 +168,25 @@ async function main() {
     }
 
     case 'render-next': {
-      const template = (process.argv[3] || 'CinematicVertical') as CompositionId;
+      const TEMPLATE_WEIGHTS: [string, number][] = [
+        ['CinematicVertical', 0.5],
+        ['POVVertical', 0.5],
+      ];
+
+      function pickWeightedTemplate(): CompositionId {
+        const r = Math.random();
+        let cumulative = 0;
+        for (const [name, weight] of TEMPLATE_WEIGHTS) {
+          cumulative += weight;
+          if (r < cumulative) return name as CompositionId;
+        }
+        return TEMPLATE_WEIGHTS[0][0] as CompositionId;
+      }
+
+      const rawTemplate = process.argv[3] || 'CinematicVertical';
+      const template = rawTemplate === 'auto'
+        ? pickWeightedTemplate()
+        : rawTemplate as CompositionId;
       const count = Math.min(parseInt(process.argv[4] || '1', 10), 5);
       const targetPlatform = (process.argv[5] || 'instagram') as 'instagram' | 'tiktok' | 'youtube';
 
@@ -201,31 +219,44 @@ async function main() {
         break;
       }
 
-      // Shuffle and pick up to `count`
-      const shuffled = candidates.sort(() => Math.random() - 0.5);
-      const selected = shuffled.slice(0, count);
+      // Prioritize UGC (non-seeded) messages — submitters share their own videos
+      const sorted = candidates.sort((a, b) => {
+        if (a.seeded === b.seeded) return Math.random() - 0.5;
+        return a.seeded ? 1 : -1; // non-seeded first
+      });
+      const selected = sorted.slice(0, count);
 
       console.log(`Found ${unused.length} unused messages, rendering ${selected.length} for ${targetPlatform}...\n`);
 
+      const isAutoTemplate = rawTemplate === 'auto';
+
       for (const msg of selected) {
+        // Pick a fresh template for each video in auto mode
+        const videoTemplate = isAutoTemplate ? pickWeightedTemplate() : template;
         const timestamp = Date.now();
-        const outputPath = path.join(OUTPUT_DIR, `${template}-${timestamp}.mp4`);
+        const outputPath = path.join(OUTPUT_DIR, `${videoTemplate}-${timestamp}.mp4`);
         const mood = detectMood(msg.content, msg.from, msg.to);
 
         console.log(`Rendering: "${msg.content.slice(0, 80)}..."`);
-        console.log(`  From: ${msg.from} → To: ${msg.to} | Mood: ${mood}`);
+        console.log(`  From: ${msg.from} → To: ${msg.to} | Mood: ${mood} | Template: ${videoTemplate}`);
 
         let backgroundVideo: string | undefined;
 
-        if (isCinematic(template)) {
+        if (isCinematic(videoTemplate)) {
           console.log('  Preparing background video...');
           await ensureBundle();
-          backgroundVideo = await prepareBgVideo(mood, template);
+          backgroundVideo = await prepareBgVideo(mood, videoTemplate);
         }
 
-        const renderProps = { from: msg.from, to: msg.to, content: msg.content, backgroundVideo };
+        const renderProps = {
+          from: msg.from, to: msg.to, content: msg.content, backgroundVideo,
+          ...(targetPlatform === 'youtube' ? {
+            ctaLine1: 'Subscribe for more',
+            ctaLine2: '@wordsleftunsent',
+          } : {}),
+        };
         await renderVideo({
-          compositionId: template,
+          compositionId: videoTemplate,
           props: renderProps,
           outputPath,
         });
@@ -242,7 +273,7 @@ async function main() {
           videoPath: outputPath,
           coverImagePath: coverPath,
           messageIds: [msg.id],
-          template,
+          template: videoTemplate,
           mood,
           platform: targetPlatform,
           isExploration: false,

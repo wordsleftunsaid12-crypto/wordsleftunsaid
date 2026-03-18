@@ -324,6 +324,14 @@ export async function startScheduler(options: SchedulerOptions = {}): Promise<vo
       },
     },
     {
+      name: 'threads-text',
+      baseInterval: INTERVALS.THREADS_TEXT,
+      fn: async () => {
+        const { postStandaloneThread } = await import('../content/threads-standalone.js');
+        await withBrowserLock(SESSION_DIRS.threads, () => postStandaloneThread({ dryRun }));
+      },
+    },
+    {
       name: 'unfollow',
       baseInterval: INTERVALS.UNFOLLOW,
       fn: async () => {

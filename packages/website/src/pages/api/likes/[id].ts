@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { getMessageById, likeMessage, unlikeMessage } from '@wlu/shared';
+import { getMessageById, likeMessage, unlikeMessage, notifyFirstLike, markFirstLikeNotified } from '@wlu/shared';
 
 export const POST: APIRoute = async ({ params, request }) => {
   const messageId = params.id;
@@ -48,6 +48,15 @@ export const POST: APIRoute = async ({ params, request }) => {
     // Re-fetch to get trigger-updated like_count
     const updated = await getMessageById(messageId);
     const likeCount = updated?.like_count ?? message.like_count;
+
+    // Notify submitter on first like (UGC messages only)
+    if (action !== 'unlike' && updated && updated.like_count === 1
+      && updated.email && !updated.seeded && !updated.first_like_notified) {
+      const siteUrl = import.meta.env.SITE || 'https://wordsleftunsent.com';
+      notifyFirstLike({ messageId, email: updated.email, to: updated.to, siteUrl })
+        .then(() => markFirstLikeNotified(messageId))
+        .catch(() => {}); // fire-and-forget
+    }
 
     return new Response(
       JSON.stringify({ success: true, like_count: likeCount, liked: action !== 'unlike' }),

@@ -11,9 +11,9 @@ interface RedditPublishResult {
 
 /** Target subreddits for posting, in priority order. */
 const TARGET_SUBREDDITS = [
-  'UnsentLetters',
   'offmychest',
-  'unsentletters',
+  'TrueOffMyChest',
+  'self',
 ];
 
 /**
@@ -53,12 +53,12 @@ export async function browserPublishReddit(options: {
   // Use original message content — fall back to caption only as last resort
   const title = options.messageTo
     ? `To ${options.messageTo}`
-    : 'Words left unsent';
+    : 'An unsent letter';
 
   const body = options.messageContent ?? options.caption.split('\n')[0];
-  const attribution = options.messageFrom ? `\n\n— *${options.messageFrom}*` : '';
-  const linkUrl = options.utmUrl ?? 'https://wordsleftunsent.com';
-  const footer = `${attribution}\n\n---\n*Read more anonymous messages at [wordsleftunsent.com](${linkUrl})*`;
+  // No promotional footer — Reddit bans for self-promotion.
+  // Website link belongs in profile bio only.
+  const attribution = options.messageFrom ? `\n\n\u2014 *${options.messageFrom}*` : '';
 
   if (options.dryRun) {
     console.log('[reddit-publish] [DRY RUN] Would post to r/' + subreddit);
@@ -72,7 +72,7 @@ export async function browserPublishReddit(options: {
   const { context, page } = await launchReddit();
 
   try {
-    await submitTextPost(page, subreddit, title, body + footer);
+    await submitTextPost(page, subreddit, title, body + attribution);
 
     console.log('[reddit-publish] Post submitted successfully!');
 

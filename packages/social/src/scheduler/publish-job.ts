@@ -193,9 +193,15 @@ export async function publishNextScheduled(
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
 
-    // Rate-limited items stay scheduled — they'll retry next cycle/day
+    // Rate-limited items get rescheduled to tomorrow to stop retry loops
     if (msg.includes('Daily posting limit')) {
-      console.log(`[publish-job] ${platform} daily limit reached — skipping ${item.id.slice(0, 8)}`);
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(10, 0, 0, 0); // 10 AM tomorrow
+      await updateContentQueueStatus(item.id, 'scheduled', {
+        scheduledFor: tomorrow.toISOString(),
+      });
+      console.log(`[publish-job] ${platform} daily limit reached — rescheduled ${item.id.slice(0, 8)} to ${tomorrow.toISOString()}`);
       return false;
     }
 

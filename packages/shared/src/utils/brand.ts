@@ -23,7 +23,9 @@ export const BRAND = {
   tagline: 'The messages we never sent.',
 } as const;
 
-/** Max message content length (chars) that fits on a CinematicVertical video frame.
- * Frame: 1080×1920, Georgia 68px, lineHeight 1.65, padding 250/120/400/70px.
- * ~9 lines available × ~18 chars/line = ~162. Use 160 for safe margin. */
+/**
+ * Default max content length for templates that don't have a specific limit.
+ * For per-template limits, use MAX_CONTENT_LENGTH from types/video.ts.
+ * @deprecated Use MAX_CONTENT_LENGTH[compositionId] from types/video.ts instead.
+ */
 export const MAX_VIDEO_CONTENT_LENGTH = 160;

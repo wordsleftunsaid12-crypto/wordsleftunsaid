@@ -12,10 +12,10 @@ import { launchTikTok, dismissModals } from '../platforms/tiktok/browser.js';
  * Even more conservative than Instagram — TikTok is aggressive about bans.
  */
 const LIMITS = {
-  maxLikesPerDay: 12,
-  maxFollowsPerDay: 3,
-  maxCommentsPerDay: 2,
-  minDelayBetweenActions: 6000, // 6 seconds (was 20s)
+  maxLikesPerDay: 6,
+  maxFollowsPerDay: 2,
+  maxCommentsPerDay: 1,
+  minDelayBetweenActions: 10000, // 10 seconds between actions
 } as const;
 
 /** Our own account usernames — skip these during outbound engagement */

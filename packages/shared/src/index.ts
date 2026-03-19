@@ -7,7 +7,7 @@ export type {
   VideoConfig,
   MessageVariation,
 } from './types/video.js';
-export { VIDEO_PRESETS } from './types/video.js';
+export { VIDEO_PRESETS, MAX_CONTENT_LENGTH } from './types/video.js';
 export type {
   Platform,
   PostTarget,

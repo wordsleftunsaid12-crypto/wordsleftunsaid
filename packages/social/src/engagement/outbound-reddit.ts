@@ -11,9 +11,9 @@ import { launchReddit } from '../platforms/reddit/browser.js';
  * Reddit is aggressive about detecting bot-like behavior.
  */
 const LIMITS = {
-  maxUpvotesPerDay: 10,
-  maxCommentsPerDay: 2,
-  minDelayBetweenActions: 8000, // 8 seconds between actions
+  maxUpvotesPerDay: 6,
+  maxCommentsPerDay: 1,
+  minDelayBetweenActions: 10000, // 10 seconds between actions
 } as const;
 
 const OWN_ACCOUNTS = ['UnsaidWords', 'Proud-Minute4849', 'wordsleftunsent'];

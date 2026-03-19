@@ -220,6 +220,43 @@ export async function generateDailySummary(): Promise<void> {
   console.log(`  QA passed:  ${qaPassed.length}`);
   console.log(`  Pending:    ${pending.length}`);
 
+  // --- Template Performance ---
+  const templateCounts: Record<string, number> = {};
+  for (const post of todayPosts) {
+    const tmpl = post.template ?? 'unknown';
+    templateCounts[tmpl] = (templateCounts[tmpl] ?? 0) + 1;
+  }
+
+  // Also count recent posts (7 days) for weekly template distribution
+  const weekPosts = await getRecentPosts(7, { limit: 500 });
+  const weekTemplateCounts: Record<string, number> = {};
+  for (const post of weekPosts) {
+    const tmpl = post.template ?? 'unknown';
+    weekTemplateCounts[tmpl] = (weekTemplateCounts[tmpl] ?? 0) + 1;
+  }
+
+  console.log('');
+  console.log('  TEMPLATE PERFORMANCE');
+  console.log('  ' + '\u2500'.repeat(40));
+
+  if (Object.keys(templateCounts).length === 0) {
+    console.log('  No posts today');
+  } else {
+    console.log('  Today:');
+    for (const [tmpl, count] of Object.entries(templateCounts).sort((a, b) => b[1] - a[1])) {
+      console.log(`    ${tmpl.padEnd(28)} ${count}`);
+    }
+  }
+
+  if (Object.keys(weekTemplateCounts).length > 0) {
+    const weekTotal = Object.values(weekTemplateCounts).reduce((a, b) => a + b, 0);
+    console.log(`  This week (${weekTotal} total):`);
+    for (const [tmpl, count] of Object.entries(weekTemplateCounts).sort((a, b) => b[1] - a[1])) {
+      const pct = Math.round((count / weekTotal) * 100);
+      console.log(`    ${tmpl.padEnd(28)} ${String(count).padStart(3)} (${String(pct).padStart(2)}%)`);
+    }
+  }
+
   // --- Trends ---
   console.log('');
   console.log('  TRENDS');

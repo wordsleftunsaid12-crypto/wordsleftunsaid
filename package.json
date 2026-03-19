@@ -18,5 +18,8 @@
     "report": "npm run report --workspace=packages/analytics",
     "db:migrate": "npx supabase db push",
     "db:status": "npx supabase db status"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.0"
   }
 }

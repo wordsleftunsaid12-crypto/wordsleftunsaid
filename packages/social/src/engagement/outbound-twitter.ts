@@ -11,10 +11,10 @@ import { launchTwitter } from '../platforms/twitter/browser.js';
  * Twitter rate-limits aggressively — keep volumes low.
  */
 const LIMITS = {
-  maxLikesPerDay: 12,
-  maxRetweetsPerDay: 3,
-  maxCommentsPerDay: 2,
-  minDelayBetweenActions: 6000, // 6 seconds between actions
+  maxLikesPerDay: 6,
+  maxRetweetsPerDay: 2,
+  maxCommentsPerDay: 1,
+  minDelayBetweenActions: 10000, // 10 seconds between actions
 } as const;
 
 const OWN_ACCOUNTS = ['unsentwords12', 'wordsleftunsent'];

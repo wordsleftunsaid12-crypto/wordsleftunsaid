@@ -12,10 +12,10 @@ import { launchYouTube, dismissModals } from '../platforms/youtube/browser.js';
  * Most conservative of the three platforms — YouTube is strict about automation.
  */
 const LIMITS = {
-  maxLikesPerDay: 10,
-  maxSubscribesPerDay: 2,
-  maxCommentsPerDay: 2,
-  minDelayBetweenActions: 8000, // 8 seconds (was 25s)
+  maxLikesPerDay: 6,
+  maxSubscribesPerDay: 1,
+  maxCommentsPerDay: 1,
+  minDelayBetweenActions: 10000, // 10 seconds between actions
 } as const;
 
 /** Our own channel usernames — skip these during outbound engagement */

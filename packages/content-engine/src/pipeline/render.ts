@@ -17,7 +17,11 @@ export type CompositionId =
   | 'ModernSquare'
   | 'CinematicVertical'
   | 'CinematicSquare'
-  | 'POVVertical';
+  | 'POVVertical'
+  | 'TextOnGradientVertical'
+  | 'TypewriterVertical'
+  | 'HandwrittenVertical'
+  | 'VoiceNarrationVertical';
 
 export interface RenderOptions {
   compositionId: CompositionId;
@@ -28,6 +32,13 @@ export interface RenderOptions {
     backgroundVideo?: string;
     ctaLine1?: string;
     ctaLine2?: string;
+    mood?: string;
+    /** TTS audio filename (relative to public/) for VoiceNarration */
+    audioFile?: string;
+    /** Word-level timing data for VoiceNarration sync */
+    wordTimings?: Array<{ word: string; startMs: number; endMs: number }>;
+    /** Audio duration in ms for VoiceNarration dynamic duration */
+    audioDurationMs?: number;
   };
   outputPath: string;
 }

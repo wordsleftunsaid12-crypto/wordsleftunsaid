@@ -11,9 +11,9 @@ import { launchThreads } from '../platforms/threads/browser.js';
  * Threads is Meta-owned — same aggressive bot detection as Instagram.
  */
 const LIMITS = {
-  maxLikesPerDay: 12,
-  maxCommentsPerDay: 2,
-  minDelayBetweenActions: 6000, // 6 seconds between actions
+  maxLikesPerDay: 6,
+  maxCommentsPerDay: 1,
+  minDelayBetweenActions: 10000, // 10 seconds between actions
 } as const;
 
 const OWN_ACCOUNTS = ['u.wordsleftunsent', 'wordsleftunsent'];

@@ -168,29 +168,17 @@ async function main() {
     }
 
     case 'render-next': {
-      const TEMPLATE_WEIGHTS: [string, number][] = [
-        ['CinematicVertical', 0.5],
-        ['POVVertical', 0.5],
-      ];
-
-      function pickWeightedTemplate(): CompositionId {
-        const r = Math.random();
-        let cumulative = 0;
-        for (const [name, weight] of TEMPLATE_WEIGHTS) {
-          cumulative += weight;
-          if (r < cumulative) return name as CompositionId;
-        }
-        return TEMPLATE_WEIGHTS[0][0] as CompositionId;
-      }
+      const { getTemplateWeights, pickWeightedTemplate } = await import('./pipeline/template-weights.js');
 
       const rawTemplate = process.argv[3] || 'CinematicVertical';
-      const template = rawTemplate === 'auto'
-        ? pickWeightedTemplate()
-        : rawTemplate as CompositionId;
-      const count = Math.min(parseInt(process.argv[4] || '1', 10), 5);
       const targetPlatform = (process.argv[5] || 'instagram') as 'instagram' | 'tiktok' | 'youtube';
 
-      const { getApprovedMessages, getUsedMessageIds } = await import('@wlu/shared');
+      const template = rawTemplate === 'auto'
+        ? pickWeightedTemplate(getTemplateWeights(targetPlatform))
+        : rawTemplate as CompositionId;
+      const count = Math.min(parseInt(process.argv[4] || '1', 10), 5);
+
+      const { getApprovedMessages, getUsedMessageIds, MAX_CONTENT_LENGTH } = await import('@wlu/shared');
 
       console.log('\nFetching unused messages...');
       const [allMessages, usedIds] = await Promise.all([
@@ -206,21 +194,8 @@ async function main() {
         break;
       }
 
-      // Hard filter — never render messages that won't fit on screen
-      const { MAX_VIDEO_CONTENT_LENGTH } = await import('@wlu/shared');
-      const candidates = unused.filter((m) => m.content.length <= MAX_VIDEO_CONTENT_LENGTH);
-      const skippedCount = unused.length - candidates.length;
-      if (skippedCount > 0) {
-        console.log(`Skipped ${skippedCount} message(s) exceeding ${MAX_VIDEO_CONTENT_LENGTH} chars`);
-      }
-
-      if (candidates.length === 0) {
-        console.log('No unused messages short enough for video. Seed more or add shorter messages.');
-        break;
-      }
-
       // Prioritize UGC (non-seeded) messages — submitters share their own videos
-      const sorted = candidates.sort((a, b) => {
+      const sorted = unused.sort((a, b) => {
         if (a.seeded === b.seeded) return Math.random() - 0.5;
         return a.seeded ? 1 : -1; // non-seeded first
       });
@@ -232,7 +207,17 @@ async function main() {
 
       for (const msg of selected) {
         // Pick a fresh template for each video in auto mode
-        const videoTemplate = isAutoTemplate ? pickWeightedTemplate() : template;
+        const videoTemplate = isAutoTemplate
+          ? pickWeightedTemplate(getTemplateWeights(targetPlatform))
+          : template;
+
+        // Per-template content length filter
+        const maxLen = MAX_CONTENT_LENGTH[videoTemplate] ?? 160;
+        if (msg.content.length > maxLen) {
+          console.log(`  Skipping "${msg.content.slice(0, 40)}..." — ${msg.content.length} chars exceeds ${videoTemplate} limit (${maxLen})`);
+          continue;
+        }
+
         const timestamp = Date.now();
         const outputPath = path.join(OUTPUT_DIR, `${videoTemplate}-${timestamp}.mp4`);
         const mood = detectMood(msg.content, msg.from, msg.to);
@@ -250,6 +235,7 @@ async function main() {
 
         const renderProps = {
           from: msg.from, to: msg.to, content: msg.content, backgroundVideo,
+          mood,
           ...(targetPlatform === 'youtube' ? {
             ctaLine1: 'Subscribe for more',
             ctaLine2: '@wordsleftunsent',
@@ -399,7 +385,10 @@ async function main() {
       console.log('  qa <video-path> [content]                       - Run QA checks on a video');
       console.log('  qa-all                                           - Run QA on all pending queue items');
       console.log('\nTemplates: CinematicVertical (default), CinematicSquare,');
-      console.log('           ClassicVertical, ClassicSquare, ModernVertical, ModernSquare');
+      console.log('           ClassicVertical, ClassicSquare, ModernVertical, ModernSquare,');
+      console.log('           POVVertical, TextOnGradientVertical, TypewriterVertical,');
+      console.log('           HandwrittenVertical');
+      console.log('           Use "auto" for weighted random selection');
   }
 }
 

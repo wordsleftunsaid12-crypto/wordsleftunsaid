@@ -270,7 +270,7 @@ export async function startScheduler(options: SchedulerOptions = {}): Promise<vo
       baseInterval: INTERVALS.RENDER,
       fn: async () => {
         const { renderNextContent } = await import('../content/auto-render.js');
-        await renderNextContent({ dryRun });
+        await renderNextContent({ dryRun, platform });
       },
     },
     {

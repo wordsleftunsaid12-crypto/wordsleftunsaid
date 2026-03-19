@@ -54,7 +54,7 @@ export const POST: APIRoute = async ({ params, request }) => {
       && updated.email && !updated.seeded && !updated.first_like_notified) {
       const siteUrl = import.meta.env.SITE || 'https://wordsleftunsent.com';
       notifyFirstLike({ messageId, email: updated.email, to: updated.to, siteUrl })
-        .then(() => markFirstLikeNotified(messageId))
+        .then((sent) => { if (sent) markFirstLikeNotified(messageId); })
         .catch(() => {}); // fire-and-forget
     }
 

@@ -205,10 +205,18 @@ async function main() {
 
       const isAutoTemplate = rawTemplate === 'auto';
 
+      // VoiceNarration requires TTS data not available in auto-render path — filter and re-normalize
+      const filteredWeights = getTemplateWeights(targetPlatform)
+        .filter(([id]) => !id.startsWith('VoiceNarration'));
+      const totalWeight = filteredWeights.reduce((sum, [, w]) => sum + w, 0);
+      const autoWeights = filteredWeights.map(([id, w]) =>
+        [id, w / totalWeight] as [typeof id, number],
+      );
+
       for (const msg of selected) {
         // Pick a fresh template for each video in auto mode
         const videoTemplate = isAutoTemplate
-          ? pickWeightedTemplate(getTemplateWeights(targetPlatform))
+          ? pickWeightedTemplate(autoWeights)
           : template;
 
         // Per-template content length filter

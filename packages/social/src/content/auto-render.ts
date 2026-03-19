@@ -104,8 +104,9 @@ async function ensureUnusedMessages(needed: number): Promise<number> {
 export async function renderNextContent(options: {
   dryRun?: boolean;
   count?: number;
+  platform?: string;
 } = {}): Promise<AutoRenderResult> {
-  const { dryRun = false, count = VIDEOS_PER_CYCLE } = options;
+  const { dryRun = false, count = VIDEOS_PER_CYCLE, platform } = options;
   const result: AutoRenderResult = { rendered: 0, seeded: 0, qaPassed: 0, errors: 0 };
 
   try {
@@ -121,10 +122,11 @@ export async function renderNextContent(options: {
     const usedIdsBefore = new Set(await getUsedMessageIds());
 
     // Step 2: Render videos via content-engine CLI (auto-selects template)
-    console.log(`[auto-render] Rendering ${count} videos for Instagram...`);
+    const targetPlatform = platform || 'instagram';
+    console.log(`[auto-render] Rendering ${count} videos for ${targetPlatform}...`);
     const renderResult = await execFileAsync(
       'npx',
-      ['tsx', 'packages/content-engine/src/index.ts', 'render-next', 'auto', String(count)],
+      ['tsx', 'packages/content-engine/src/index.ts', 'render-next', 'auto', String(count), targetPlatform],
       {
         cwd: PROJECT_ROOT,
         env: { ...process.env, PATH: `/opt/homebrew/bin:${process.env.PATH}` },
@@ -134,25 +136,27 @@ export async function renderNextContent(options: {
 
     // Count rendered videos from output
     let renderedCount = (renderResult.stdout.match(/Queued with message ID tracked/g) ?? []).length;
-    console.log(`[auto-render] Rendered ${renderedCount} IG video(s)`);
+    console.log(`[auto-render] Rendered ${renderedCount} ${targetPlatform} video(s)`);
 
-    // Step 2b: Render 1 video for YouTube with subscribe CTA
-    try {
-      console.log('[auto-render] Rendering 1 video for YouTube (subscribe CTA)...');
-      const ytResult = await execFileAsync(
-        'npx',
-        ['tsx', 'packages/content-engine/src/index.ts', 'render-next', 'CinematicVertical', '1', 'youtube'],
-        {
-          cwd: PROJECT_ROOT,
-          env: { ...process.env, PATH: `/opt/homebrew/bin:${process.env.PATH}` },
-          timeout: 10 * 60 * 1000,
-        },
-      );
-      const ytRendered = (ytResult.stdout.match(/Queued with message ID tracked/g) ?? []).length;
-      renderedCount += ytRendered;
-      console.log(`[auto-render] Rendered ${ytRendered} YouTube video(s)`);
-    } catch (err) {
-      console.warn('[auto-render] YouTube render failed:', err instanceof Error ? err.message : String(err));
+    // Step 2b: Render 1 video for YouTube with subscribe CTA (only when no specific platform requested)
+    if (!platform) {
+      try {
+        console.log('[auto-render] Rendering 1 video for YouTube (subscribe CTA)...');
+        const ytResult = await execFileAsync(
+          'npx',
+          ['tsx', 'packages/content-engine/src/index.ts', 'render-next', 'CinematicVertical', '1', 'youtube'],
+          {
+            cwd: PROJECT_ROOT,
+            env: { ...process.env, PATH: `/opt/homebrew/bin:${process.env.PATH}` },
+            timeout: 10 * 60 * 1000,
+          },
+        );
+        const ytRendered = (ytResult.stdout.match(/Queued with message ID tracked/g) ?? []).length;
+        renderedCount += ytRendered;
+        console.log(`[auto-render] Rendered ${ytRendered} YouTube video(s)`);
+      } catch (err) {
+        console.warn('[auto-render] YouTube render failed:', err instanceof Error ? err.message : String(err));
+      }
     }
 
     result.rendered = renderedCount;

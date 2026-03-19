@@ -2,6 +2,7 @@ import React from 'react';
 import {
   AbsoluteFill,
   Audio,
+  Sequence,
   interpolate,
   useCurrentFrame,
   useVideoConfig,
@@ -122,13 +123,14 @@ export const VoiceNarrationMessage: React.FC<VoiceNarrationProps> = ({
         opacity: fadeOut,
       }}
     >
-      {/* Audio playback */}
+      {/* Audio playback — delayed to match word reveal offset */}
       {audioFile && (
-        <Audio
-          src={staticFile(audioFile)}
-          startFrom={0}
-          volume={1}
-        />
+        <Sequence from={audioStartFrame}>
+          <Audio
+            src={staticFile(audioFile)}
+            volume={1}
+          />
+        </Sequence>
       )}
 
       {/* Ambient warm glow */}

@@ -626,11 +626,14 @@ try {
   .sort-option {
     font-family: var(--font-body);
     font-size: 13px;
-    padding: 6px 16px;
+    padding: 10px 16px;
     border-radius: var(--radius-sm);
     color: var(--text-muted);
     text-decoration: none;
     border: 1px solid transparent;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
     transition: color 0.15s, border-color 0.15s, background 0.15s;
   }
 
@@ -663,7 +666,8 @@ try {
 
   .search-input {
     width: 100%;
-    padding: 10px 40px 10px 40px;
+    padding: 12px 40px 12px 40px;
+    min-height: 44px;
     background: rgba(26, 24, 22, 0.4);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);

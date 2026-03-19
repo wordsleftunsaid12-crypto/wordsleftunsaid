@@ -25,3 +25,4 @@ packages/social/src/**/*.js
 packages/social/src/**/*.js.map
 *.tsbuildinfo
 supabase/.temp/
+.gstack/

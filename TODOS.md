@@ -15,3 +15,19 @@
 **Depends on:** Content Format Lab Phase 1+2 shipping and 2+ weeks of template performance data (auto-weight needs engagement signal to optimize against).
 **Files:** New scraper module, `packages/content-engine/src/config/template-weights.ts` (auto-weight reads/writes), `packages/shared/src/config/env.ts` (Brevo env vars), `packages/analytics/src/reports/daily-summary.ts` (scraper insights section)
 **Added:** 2026-03-19 (Eng Review — deferred from Phase 1+2 scope)
+
+## P2: Homepage Pagination / Infinite Scroll
+**What:** Replace the 31-message full render with "Load more" or infinite scroll. Currently all messages render at once, creating a 6443px page on desktop (13340px on mobile).
+**Why:** Reduces initial payload and improves perceived performance. Also reduces layout shift from IntersectionObserver fade-in on 31 cards.
+**Effort:** S (human: ~4 hours / CC: ~20 min)
+**Depends on:** Nothing — standalone improvement.
+**Files:** `packages/website/src/pages/index.astro`, possibly new `packages/website/src/components/LoadMore.astro`
+**Added:** 2026-03-19 (Design Review — DEFERRED-001)
+
+## P3: Above-fold Cards Visible on Load
+**What:** Add `.visible` class server-side to the first 3-4 message cards so they don't start at `opacity: 0` waiting for IntersectionObserver. Above-fold content should be immediately visible.
+**Why:** First impression suffers when the top cards fade in with a delay — users see a blank messages section for ~200ms.
+**Effort:** S (human: ~1 hour / CC: ~10 min)
+**Depends on:** Nothing — standalone improvement.
+**Files:** `packages/website/src/pages/index.astro` (add `.visible` class to first N `.fade-in` children)
+**Added:** 2026-03-19 (Design Review — DEFERRED-003)

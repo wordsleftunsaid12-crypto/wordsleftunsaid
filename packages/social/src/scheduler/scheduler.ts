@@ -223,12 +223,28 @@ export async function startScheduler(options: SchedulerOptions = {}): Promise<vo
     {
       name: 'caption',
       baseInterval: INTERVALS.CAPTION,
-      fn: () => captionPendingItems({ platform: platform ?? 'instagram', dryRun }),
+      fn: async () => {
+        if (platform) return captionPendingItems({ platform, dryRun });
+        // Process all platforms so YouTube/TikTok items don't get stuck
+        let total = 0;
+        for (const p of ALL_PLATFORMS) {
+          total += await captionPendingItems({ platform: p, dryRun });
+        }
+        return total;
+      },
     },
     {
       name: 'schedule',
       baseInterval: INTERVALS.SCHEDULE,
-      fn: () => scheduleCaptionedItems({ platform: platform ?? 'instagram', dryRun }),
+      fn: async () => {
+        if (platform) return scheduleCaptionedItems({ platform, dryRun });
+        // Process all platforms so YouTube/TikTok items don't get stuck
+        let total = 0;
+        for (const p of ALL_PLATFORMS) {
+          total += await scheduleCaptionedItems({ platform: p, dryRun });
+        }
+        return total;
+      },
     },
     {
       name: 'publish',

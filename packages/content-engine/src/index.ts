@@ -323,17 +323,37 @@ async function main() {
 
       const autoWeights = getTemplateWeights(targetPlatform);
 
+      let renderedCount = 0;
       for (const msg of selected) {
         // Pick a fresh template for each video in auto mode
-        const videoTemplate = isAutoTemplate
+        let videoTemplate = isAutoTemplate
           ? pickWeightedTemplate(autoWeights)
           : template;
 
-        // Per-template content length filter
-        const maxLen = MAX_CONTENT_LENGTH[videoTemplate] ?? 160;
+        // Per-template content length filter — retry with a different template if too long
+        let maxLen = MAX_CONTENT_LENGTH[videoTemplate] ?? 160;
         if (msg.content.length > maxLen) {
-          console.log(`  Skipping "${msg.content.slice(0, 40)}..." — ${msg.content.length} chars exceeds ${videoTemplate} limit (${maxLen})`);
-          continue;
+          if (isAutoTemplate) {
+            // Try up to 5 other templates before giving up
+            let found = false;
+            for (let attempt = 0; attempt < 5; attempt++) {
+              const alt = pickWeightedTemplate(autoWeights);
+              const altMax = MAX_CONTENT_LENGTH[alt] ?? 160;
+              if (msg.content.length <= altMax) {
+                videoTemplate = alt;
+                maxLen = altMax;
+                found = true;
+                break;
+              }
+            }
+            if (!found) {
+              console.log(`  Skipping "${msg.content.slice(0, 40)}..." — ${msg.content.length} chars exceeds all tried template limits`);
+              continue;
+            }
+          } else {
+            console.log(`  Skipping "${msg.content.slice(0, 40)}..." — ${msg.content.length} chars exceeds ${videoTemplate} limit (${maxLen})`);
+            continue;
+          }
         }
 
         const timestamp = Date.now();
@@ -403,9 +423,10 @@ async function main() {
           isExploration: false,
         });
         console.log(`  Queued with message ID tracked.\n`);
+        renderedCount++;
       }
 
-      console.log(`Done! Rendered ${selected.length} video(s) from unique messages.`);
+      console.log(`Done! Rendered ${renderedCount} video(s) from unique messages.`);
       break;
     }
 

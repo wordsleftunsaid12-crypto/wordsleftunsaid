@@ -1,17 +1,21 @@
 import React from 'react';
 import {
   AbsoluteFill,
+  Video,
+  staticFile,
   interpolate,
   useCurrentFrame,
   useVideoConfig,
   Easing,
 } from 'remotion';
 import type { MessageProps } from '../compositions/Root';
+import { BackgroundMusic, useLoopFade } from './template-utils';
 
-export const ModernMessage: React.FC<MessageProps> = ({ from, to, content }) => {
+export const ModernMessage: React.FC<MessageProps & { backgroundVideo?: string }> = ({ from, to, content, musicFile, backgroundVideo }) => {
   const frame = useCurrentFrame();
-  const { height } = useVideoConfig();
+  const { height, durationInFrames } = useVideoConfig();
   const isVertical = height > 1200;
+  const loopFade = useLoopFade();
 
   // --- Animation timing ---
   const toDelay = 15;
@@ -19,24 +23,22 @@ export const ModernMessage: React.FC<MessageProps> = ({ from, to, content }) => 
   const words = content.split(' ');
   const wordRevealDuration = words.length * 5;
   const fromDelay = contentDelay + wordRevealDuration + 10;
-  const fadeOutStart = 210;
-
   // --- Background: slow breathing dark gradient ---
-  const bgBrightness = interpolate(frame, [0, 120, 240], [8, 11, 8], {
+  const bgBrightness = interpolate(frame, [0, durationInFrames / 2, durationInFrames], [8, 11, 8], {
     extrapolateRight: 'clamp',
   });
 
   // --- Ambient glow that pulses ---
   const glowOpacity = interpolate(
     frame,
-    [0, 60, 120, 180, 240],
+    [0, durationInFrames * 0.25, durationInFrames * 0.5, durationInFrames * 0.75, durationInFrames],
     [0.05, 0.15, 0.1, 0.15, 0.05],
     { extrapolateRight: 'clamp' },
   );
-  const glowScale = interpolate(frame, [0, 240], [0.9, 1.15], {
+  const glowScale = interpolate(frame, [0, durationInFrames], [0.9, 1.15], {
     extrapolateRight: 'clamp',
   });
-  const glow2X = interpolate(frame, [0, 240], [70, 60], {
+  const glow2X = interpolate(frame, [0, durationInFrames], [70, 60], {
     extrapolateRight: 'clamp',
   });
 
@@ -77,14 +79,8 @@ export const ModernMessage: React.FC<MessageProps> = ({ from, to, content }) => 
     easing: Easing.out(Easing.cubic),
   });
 
-  // --- Fade out ---
-  const fadeOut = interpolate(frame, [fadeOutStart, 240], [1, 0], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  });
-
   // --- Branding ---
-  const brandOpacity = interpolate(frame, [80, 100, 210, 240], [0, 0.4, 0.4, 0], {
+  const brandOpacity = interpolate(frame, [80, 100, durationInFrames - 30, durationInFrames], [0, 0.4, 0.4, 0], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
@@ -95,9 +91,33 @@ export const ModernMessage: React.FC<MessageProps> = ({ from, to, content }) => 
     <AbsoluteFill
       style={{
         backgroundColor: `hsl(20, 8%, ${bgBrightness}%)`,
-        opacity: fadeOut,
+        opacity: loopFade,
       }}
     >
+      <BackgroundMusic musicFile={musicFile} />
+      {/* Optional background video */}
+      {backgroundVideo && (
+        <>
+          <AbsoluteFill>
+            <Video
+              src={staticFile(backgroundVideo)}
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
+          </AbsoluteFill>
+          {/* Dark overlay for text readability */}
+          <AbsoluteFill
+            style={{
+              background: `linear-gradient(
+                180deg,
+                rgba(0, 0, 0, 0.4) 0%,
+                rgba(0, 0, 0, 0.55) 35%,
+                rgba(0, 0, 0, 0.65) 60%,
+                rgba(0, 0, 0, 0.75) 100%
+              )`,
+            }}
+          />
+        </>
+      )}
       {/* Ambient warm glow - top */}
       <div
         style={{

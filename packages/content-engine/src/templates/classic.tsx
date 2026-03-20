@@ -8,21 +8,22 @@ import {
   Easing,
 } from 'remotion';
 import type { MessageProps } from '../compositions/Root';
+import { BackgroundMusic, useLoopFade } from './template-utils';
 
-export const ClassicMessage: React.FC<MessageProps> = ({ from, to, content }) => {
+export const ClassicMessage: React.FC<MessageProps> = ({ from, to, content, musicFile }) => {
   const frame = useCurrentFrame();
-  const { fps, height } = useVideoConfig();
+  const { fps, height, durationInFrames } = useVideoConfig();
   const isVertical = height > 1200;
+  const loopFade = useLoopFade();
 
   // --- Timing ---
   const toDelay = 20;
   const contentDelay = 55;
   const totalRevealFrames = Math.max(content.length * 0.9, 45);
   const fromDelay = contentDelay + totalRevealFrames + 20;
-  const fadeOutStart = 210;
 
   // --- Background: deep warm gradient that slowly shifts ---
-  const gradAngle = interpolate(frame, [0, 240], [150, 175], { extrapolateRight: 'clamp' });
+  const gradAngle = interpolate(frame, [0, durationInFrames], [150, 175], { extrapolateRight: 'clamp' });
 
   // --- Large decorative quote mark that fades in behind text ---
   const quoteOpacity = interpolate(frame, [10, 50], [0, 0.06], {
@@ -36,11 +37,11 @@ export const ClassicMessage: React.FC<MessageProps> = ({ from, to, content }) =>
   });
 
   // --- Warm light bloom behind text area ---
-  const bloomOpacity = interpolate(frame, [30, 70, 200, 240], [0, 0.25, 0.25, 0], {
+  const bloomOpacity = interpolate(frame, [30, 70, durationInFrames - 40, durationInFrames], [0, 0.25, 0.25, 0], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
-  const bloomY = interpolate(frame, [0, 240], [45, 40], { extrapolateRight: 'clamp' });
+  const bloomY = interpolate(frame, [0, durationInFrames], [45, 40], { extrapolateRight: 'clamp' });
 
   // --- Decorative side lines ---
   const lineLength = spring({ frame: frame - 15, fps, config: { damping: 12, stiffness: 25 } });
@@ -78,14 +79,8 @@ export const ClassicMessage: React.FC<MessageProps> = ({ from, to, content }) =>
     easing: Easing.out(Easing.cubic),
   });
 
-  // --- Fade out ---
-  const fadeOut = interpolate(frame, [fadeOutStart, 240], [1, 0], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  });
-
   // --- Branding ---
-  const brandOpacity = interpolate(frame, [90, 110, 210, 240], [0, 0.45, 0.45, 0], {
+  const brandOpacity = interpolate(frame, [90, 110, durationInFrames - 30, durationInFrames], [0, 0.45, 0.45, 0], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
@@ -100,9 +95,10 @@ export const ClassicMessage: React.FC<MessageProps> = ({ from, to, content }) =>
           #c9b59e 35%,
           #bda78e 65%,
           #a8907a 100%)`,
-        opacity: fadeOut,
+        opacity: loopFade,
       }}
     >
+      <BackgroundMusic musicFile={musicFile} />
       {/* Warm light bloom behind text */}
       <div
         style={{

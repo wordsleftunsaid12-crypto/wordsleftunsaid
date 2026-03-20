@@ -282,6 +282,8 @@ export async function prepareBackgroundVideo(
   mood: MessageMood,
   width: number,
   height: number,
+  durationSec = 8,
+  withMusic = true,
 ): Promise<string> {
   const outputDir = path.resolve(__dirname, '../../output/processed');
 
@@ -290,7 +292,7 @@ export async function prepareBackgroundVideo(
   }
 
   const rawClip = selectBackgroundVideo(mood);
-  const musicTrack = selectBackgroundMusic(mood);
+  const musicTrack = withMusic ? selectBackgroundMusic(mood) : null;
   const outputPath = path.join(
     outputDir,
     `bg-${mood}-${width}x${height}-${Date.now()}.mp4`,
@@ -302,7 +304,6 @@ export async function prepareBackgroundVideo(
 
   // Probe clip duration and generate random visual transformations
   const clipDuration = await getClipDuration(rawClip);
-  const durationSec = 8; // 240 frames at 30fps
   const transforms = randomTransformations(clipDuration, durationSec);
 
   console.log(`  Transforms: offset=${transforms.startOffset.toFixed(1)}s, flip=${transforms.hflip}, sat=${transforms.saturation.toFixed(2)}`);

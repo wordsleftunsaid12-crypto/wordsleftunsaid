@@ -2,9 +2,10 @@ import 'dotenv/config';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import { renderVideo, extractCoverFromVideo, isCinematic, ensureBundle, copyToBundle } from './pipeline/render.js';
+import { renderVideo, extractCoverFromVideo, isCinematic, needsBackgroundVideo, needsMusicFile, ensureBundle, copyToBundle } from './pipeline/render.js';
 import type { CompositionId } from './pipeline/render.js';
 import { detectMood } from './pipeline/mood.js';
+import { calculateDurationFrames } from './templates/template-utils.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const OUTPUT_DIR = path.resolve(__dirname, '../output');
@@ -16,13 +17,15 @@ const command = process.argv[2];
 async function prepareBgVideo(
   mood: 'tender' | 'regretful' | 'hopeful' | 'bittersweet' | 'raw',
   template: string,
+  durationSec = 8,
+  withMusic = true,
 ): Promise<string> {
   const { prepareBackgroundVideo } = await import('./pipeline/video-assets.js');
   const { VIDEO_PRESETS } = await import('@wlu/shared');
 
   const isVertical = template.includes('Vertical');
   const preset = isVertical ? VIDEO_PRESETS['9:16'] : VIDEO_PRESETS['1:1'];
-  const processedPath = await prepareBackgroundVideo(mood, preset.width, preset.height);
+  const processedPath = await prepareBackgroundVideo(mood, preset.width, preset.height, durationSec, withMusic);
 
   fs.mkdirSync(PUBLIC_DIR, { recursive: true });
   const bgFilename = path.basename(processedPath);
@@ -31,6 +34,67 @@ async function prepareBgVideo(
   copyToBundle(processedPath, bgFilename);
 
   return bgFilename;
+}
+
+/**
+ * Select a background music track and copy it into the Remotion bundle.
+ * Returns the filename for use as musicFile prop.
+ */
+async function prepareMusicFile(
+  mood: 'tender' | 'regretful' | 'hopeful' | 'bittersweet' | 'raw',
+): Promise<string | undefined> {
+  const { selectBackgroundMusic } = await import('./pipeline/video-assets.js');
+  const musicPath = selectBackgroundMusic(mood);
+  if (!musicPath) return undefined;
+
+  await ensureBundle();
+  const musicFilename = path.basename(musicPath);
+  fs.mkdirSync(PUBLIC_DIR, { recursive: true });
+  fs.copyFileSync(musicPath, path.join(PUBLIC_DIR, musicFilename));
+  copyToBundle(musicPath, musicFilename);
+
+  console.log(`  Music track: ${musicFilename}`);
+  return musicFilename;
+}
+
+/**
+ * Generate TTS audio for VoiceNarration template, copy into the Remotion bundle,
+ * and return props needed by the VoiceNarration component.
+ */
+async function prepareTTS(
+  content: string,
+  mood: 'tender' | 'regretful' | 'hopeful' | 'bittersweet' | 'raw',
+  voiceGender: 'male' | 'female' = 'male',
+): Promise<{
+  audioFile: string;
+  wordTimings: Array<{ word: string; startMs: number; endMs: number }>;
+  audioDurationMs: number;
+  durationFrames: number;
+}> {
+  const { generateTTS, cleanupTTS } = await import('./pipeline/tts.js');
+  const ttsResult = await generateTTS(content, mood, voiceGender);
+
+  await ensureBundle();
+  const audioFilename = path.basename(ttsResult.audioPath);
+  fs.mkdirSync(PUBLIC_DIR, { recursive: true });
+  fs.copyFileSync(ttsResult.audioPath, path.join(PUBLIC_DIR, audioFilename));
+  copyToBundle(ttsResult.audioPath, audioFilename);
+
+  // Clean up the original TTS file from output/tts/
+  cleanupTTS(ttsResult.audioPath);
+
+  console.log(`  TTS audio: ${audioFilename} (${ttsResult.durationSec.toFixed(1)}s, ${ttsResult.durationFrames} frames)`);
+
+  return {
+    audioFile: audioFilename,
+    wordTimings: ttsResult.wordTimings,
+    audioDurationMs: ttsResult.durationMs,
+    durationFrames: ttsResult.durationFrames,
+  };
+}
+
+function isVoiceNarration(template: string): boolean {
+  return template.startsWith('VoiceNarration');
 }
 
 /**
@@ -70,19 +134,43 @@ async function main() {
       console.log(`  Content: ${content}\n`);
 
       let backgroundVideo: string | undefined;
+      let musicFile: string | undefined;
+      const durationSec = calculateDurationFrames(content) / 30;
 
-      if (isCinematic(template)) {
+      if (needsBackgroundVideo(template)) {
         console.log(`Preparing background video (mood: ${mood})...`);
         await ensureBundle();
         backgroundVideo = await prepareBgVideo(
           mood as 'tender' | 'regretful' | 'hopeful' | 'bittersweet' | 'raw',
           template,
+          durationSec,
+          isCinematic(template), // Only embed music for Cinematic (others use <Audio>)
         );
+      }
+
+      if (needsMusicFile(template)) {
+        musicFile = await prepareMusicFile(
+          mood as 'tender' | 'regretful' | 'hopeful' | 'bittersweet' | 'raw',
+        );
+      }
+
+      // VoiceNarration: generate TTS audio + word timings
+      let ttsProps: Record<string, unknown> = {};
+      if (isVoiceNarration(template)) {
+        const tts = await prepareTTS(
+          content,
+          mood as 'tender' | 'regretful' | 'hopeful' | 'bittersweet' | 'raw',
+        );
+        ttsProps = {
+          audioFile: tts.audioFile,
+          wordTimings: tts.wordTimings,
+          audioDurationMs: tts.audioDurationMs,
+        };
       }
 
       await renderVideo({
         compositionId: template,
-        props: { from, to, content, backgroundVideo },
+        props: { from, to, content, backgroundVideo, musicFile, mood, ...ttsProps },
         outputPath,
       });
 
@@ -128,15 +216,41 @@ async function main() {
         console.log(`\nRendering [${s.mood}]: "${s.message.content}"`);
 
         let backgroundVideo: string | undefined;
+        let musicFile: string | undefined;
+        const batchDurationSec = calculateDurationFrames(s.message.content) / 30;
 
         try {
-          if (isCinematic(template)) {
+          if (needsBackgroundVideo(template)) {
             console.log(`  Preparing background video (mood: ${s.mood})...`);
             await ensureBundle();
             backgroundVideo = await prepareBgVideo(
               s.mood as 'tender' | 'regretful' | 'hopeful' | 'bittersweet' | 'raw',
               template,
+              batchDurationSec,
+              isCinematic(template),
             );
+          }
+
+          if (needsMusicFile(template)) {
+            musicFile = await prepareMusicFile(
+              s.mood as 'tender' | 'regretful' | 'hopeful' | 'bittersweet' | 'raw',
+            );
+          }
+
+          let batchTtsProps: Record<string, unknown> = {};
+          if (isVoiceNarration(template)) {
+            const batchContentHash = s.message.content.split('').reduce((a: number, c: string) => a + c.charCodeAt(0), 0);
+            const batchVoiceGender = batchContentHash % 2 === 0 ? 'male' as const : 'female' as const;
+            const tts = await prepareTTS(
+              s.message.content,
+              s.mood as 'tender' | 'regretful' | 'hopeful' | 'bittersweet' | 'raw',
+              batchVoiceGender,
+            );
+            batchTtsProps = {
+              audioFile: tts.audioFile,
+              wordTimings: tts.wordTimings,
+              audioDurationMs: tts.audioDurationMs,
+            };
           }
 
           await renderVideo({
@@ -146,6 +260,8 @@ async function main() {
               to: s.message.to,
               content: s.message.content,
               backgroundVideo,
+              musicFile,
+              ...batchTtsProps,
             },
             outputPath,
           });
@@ -205,13 +321,7 @@ async function main() {
 
       const isAutoTemplate = rawTemplate === 'auto';
 
-      // VoiceNarration requires TTS data not available in auto-render path — filter and re-normalize
-      const filteredWeights = getTemplateWeights(targetPlatform)
-        .filter(([id]) => !id.startsWith('VoiceNarration'));
-      const totalWeight = filteredWeights.reduce((sum, [, w]) => sum + w, 0);
-      const autoWeights = filteredWeights.map(([id, w]) =>
-        [id, w / totalWeight] as [typeof id, number],
-      );
+      const autoWeights = getTemplateWeights(targetPlatform);
 
       for (const msg of selected) {
         // Pick a fresh template for each video in auto mode
@@ -234,16 +344,36 @@ async function main() {
         console.log(`  From: ${msg.from} → To: ${msg.to} | Mood: ${mood} | Template: ${videoTemplate}`);
 
         let backgroundVideo: string | undefined;
+        let musicFile: string | undefined;
+        const nextDurationSec = calculateDurationFrames(msg.content) / 30;
 
-        if (isCinematic(videoTemplate)) {
+        if (needsBackgroundVideo(videoTemplate)) {
           console.log('  Preparing background video...');
           await ensureBundle();
-          backgroundVideo = await prepareBgVideo(mood, videoTemplate);
+          backgroundVideo = await prepareBgVideo(mood, videoTemplate, nextDurationSec, isCinematic(videoTemplate));
+        }
+
+        if (needsMusicFile(videoTemplate)) {
+          musicFile = await prepareMusicFile(mood);
+        }
+
+        let nextTtsProps: Record<string, unknown> = {};
+        if (isVoiceNarration(videoTemplate)) {
+          // Alternate voice gender based on content hash for variety
+          const contentHash = msg.content.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
+          const voiceGender = contentHash % 2 === 0 ? 'male' as const : 'female' as const;
+          const tts = await prepareTTS(msg.content, mood, voiceGender);
+          nextTtsProps = {
+            audioFile: tts.audioFile,
+            wordTimings: tts.wordTimings,
+            audioDurationMs: tts.audioDurationMs,
+          };
         }
 
         const renderProps = {
-          from: msg.from, to: msg.to, content: msg.content, backgroundVideo,
+          from: msg.from, to: msg.to, content: msg.content, backgroundVideo, musicFile,
           mood,
+          ...nextTtsProps,
           ...(targetPlatform === 'youtube' ? {
             ctaLine1: 'Subscribe for more',
             ctaLine2: '@wordsleftunsent',
@@ -325,14 +455,32 @@ async function main() {
         console.log(`    Template: ${template} | Mood: ${mood}`);
 
         let backgroundVideo: string | undefined;
+        let musicFile: string | undefined;
+        const rerenderDurationSec = calculateDurationFrames(msgContent) / 30;
 
-        if (isCinematic(template)) {
+        if (needsBackgroundVideo(template)) {
           console.log('    Preparing background video...');
           await ensureBundle();
-          backgroundVideo = await prepareBgVideo(mood, template);
+          backgroundVideo = await prepareBgVideo(mood, template, rerenderDurationSec, isCinematic(template));
         }
 
-        const renderProps = { from: msgFrom, to: msgTo, content: msgContent, backgroundVideo };
+        if (needsMusicFile(template)) {
+          musicFile = await prepareMusicFile(mood);
+        }
+
+        let rerenderTtsProps: Record<string, unknown> = {};
+        if (isVoiceNarration(template)) {
+          const rrContentHash = msgContent.split('').reduce((a: number, c: string) => a + c.charCodeAt(0), 0);
+          const rrVoiceGender = rrContentHash % 2 === 0 ? 'male' as const : 'female' as const;
+          const tts = await prepareTTS(msgContent, mood, rrVoiceGender);
+          rerenderTtsProps = {
+            audioFile: tts.audioFile,
+            wordTimings: tts.wordTimings,
+            audioDurationMs: tts.audioDurationMs,
+          };
+        }
+
+        const renderProps = { from: msgFrom, to: msgTo, content: msgContent, backgroundVideo, musicFile, ...rerenderTtsProps };
         await renderVideo({
           compositionId: template,
           props: renderProps,

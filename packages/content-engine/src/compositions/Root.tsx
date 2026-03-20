@@ -5,16 +5,19 @@ import { ModernMessage } from '../templates/modern';
 import { CinematicMessage } from '../templates/cinematic';
 import type { CinematicProps } from '../templates/cinematic';
 import { POVMessage } from '../templates/pov';
+import type { POVProps } from '../templates/pov';
 import { TextOnGradientMessage } from '../templates/textongradient';
 import { TypewriterMessage } from '../templates/typewriter';
 import { HandwrittenMessage } from '../templates/handwritten';
 import { VoiceNarrationMessage } from '../templates/voicenarration';
 import type { VoiceNarrationProps } from '../templates/voicenarration';
+import { calculateDurationFrames } from '../templates/template-utils';
 
 export type MessageProps = {
   from: string;
   to: string;
   content: string;
+  musicFile?: string;
 };
 
 export const RemotionRoot: React.FC = () => {
@@ -29,6 +32,21 @@ export const RemotionRoot: React.FC = () => {
     backgroundVideo: 'bg-placeholder.mp4',
   };
 
+  const povProps: POVProps = {
+    ...commonProps,
+    backgroundVideo: undefined,
+    musicFile: undefined,
+  };
+
+  const modernProps: MessageProps & { backgroundVideo?: string } = {
+    ...commonProps,
+    backgroundVideo: undefined,
+  };
+
+  const calcDuration = async ({ props }: { props: Record<string, unknown> }) => ({
+    durationInFrames: calculateDurationFrames((props as MessageProps).content),
+  });
+
   return (
     <>
       {/* Vertical (Reels / TikTok) */}
@@ -40,6 +58,7 @@ export const RemotionRoot: React.FC = () => {
         width={1080}
         height={1920}
         defaultProps={commonProps}
+        calculateMetadata={calcDuration}
       />
       <Composition
         id="ModernVertical"
@@ -48,7 +67,8 @@ export const RemotionRoot: React.FC = () => {
         fps={30}
         width={1080}
         height={1920}
-        defaultProps={commonProps}
+        defaultProps={modernProps}
+        calculateMetadata={calcDuration}
       />
       <Composition
         id="CinematicVertical"
@@ -58,6 +78,7 @@ export const RemotionRoot: React.FC = () => {
         width={1080}
         height={1920}
         defaultProps={cinematicProps}
+        calculateMetadata={calcDuration}
       />
       <Composition
         id="POVVertical"
@@ -66,7 +87,8 @@ export const RemotionRoot: React.FC = () => {
         fps={30}
         width={1080}
         height={1920}
-        defaultProps={commonProps}
+        defaultProps={povProps}
+        calculateMetadata={calcDuration}
       />
       <Composition
         id="TextOnGradientVertical"
@@ -76,6 +98,7 @@ export const RemotionRoot: React.FC = () => {
         width={1080}
         height={1920}
         defaultProps={{ ...commonProps, mood: 'tender' }}
+        calculateMetadata={calcDuration}
       />
       <Composition
         id="TypewriterVertical"
@@ -85,6 +108,7 @@ export const RemotionRoot: React.FC = () => {
         width={1080}
         height={1920}
         defaultProps={commonProps}
+        calculateMetadata={calcDuration}
       />
       <Composition
         id="HandwrittenVertical"
@@ -94,6 +118,7 @@ export const RemotionRoot: React.FC = () => {
         width={1080}
         height={1920}
         defaultProps={commonProps}
+        calculateMetadata={calcDuration}
       />
 
       {/* VoiceNarration — dynamic duration, passed via inputProps at render time */}
@@ -109,10 +134,10 @@ export const RemotionRoot: React.FC = () => {
           audioFile: undefined,
           wordTimings: undefined,
           audioDurationMs: 5000,
-        } as VoiceNarrationProps}
+        } as unknown as VoiceNarrationProps}
         calculateMetadata={async ({ props }) => {
           // Dynamic duration: use audioDurationMs + 4s padding (2s intro + 2s outro)
-          const audioDurationMs = (props as VoiceNarrationProps).audioDurationMs ?? 5000;
+          const audioDurationMs = (props as unknown as VoiceNarrationProps).audioDurationMs ?? 5000;
           const totalSec = audioDurationMs / 1000 + 4;
           return {
             durationInFrames: Math.ceil(totalSec * 30),
@@ -129,6 +154,7 @@ export const RemotionRoot: React.FC = () => {
         width={1080}
         height={1080}
         defaultProps={commonProps}
+        calculateMetadata={calcDuration}
       />
       <Composition
         id="ModernSquare"
@@ -137,7 +163,8 @@ export const RemotionRoot: React.FC = () => {
         fps={30}
         width={1080}
         height={1080}
-        defaultProps={commonProps}
+        defaultProps={modernProps}
+        calculateMetadata={calcDuration}
       />
       <Composition
         id="CinematicSquare"
@@ -147,6 +174,7 @@ export const RemotionRoot: React.FC = () => {
         width={1080}
         height={1080}
         defaultProps={cinematicProps}
+        calculateMetadata={calcDuration}
       />
     </>
   );

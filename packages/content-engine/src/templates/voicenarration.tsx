@@ -17,6 +17,7 @@ import {
   CTASection,
   Attribution,
   useFadeIn,
+  useLoopFade,
 } from './template-utils';
 
 export interface VoiceNarrationProps extends MessageProps {
@@ -47,6 +48,7 @@ export const VoiceNarrationMessage: React.FC<VoiceNarrationProps> = ({
   const frame = useCurrentFrame();
   const { fps, durationInFrames, height } = useVideoConfig();
   const isVertical = height > 1200;
+  const loopFade = useLoopFade();
 
   const currentTimeMs = (frame / fps) * 1000;
 
@@ -96,13 +98,6 @@ export const VoiceNarrationMessage: React.FC<VoiceNarrationProps> = ({
   const ctaDelay = fromDelay + 25;
   const ctaAnim = useFadeIn(ctaDelay, 20);
 
-  // Fade out at the end
-  const fadeOutStart = durationInFrames - 30;
-  const fadeOut = interpolate(frame, [fadeOutStart, durationInFrames], [1, 0], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  });
-
   // Ambient glow breathing
   const glowOpacity = interpolate(
     frame,
@@ -120,7 +115,7 @@ export const VoiceNarrationMessage: React.FC<VoiceNarrationProps> = ({
     <AbsoluteFill
       style={{
         background: 'linear-gradient(170deg, #0a0908 0%, #141210 40%, #0d0b0a 100%)',
-        opacity: fadeOut,
+        opacity: loopFade,
       }}
     >
       {/* Audio playback — delayed to match word reveal offset */}

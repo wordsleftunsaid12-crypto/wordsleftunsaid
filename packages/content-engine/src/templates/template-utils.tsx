@@ -1,7 +1,9 @@
 import React from 'react';
 import {
   AbsoluteFill,
+  Audio,
   interpolate,
+  staticFile,
   useCurrentFrame,
   useVideoConfig,
   Easing,
@@ -267,3 +269,58 @@ export const MOOD_COLORS: Record<string, string> = {
   bittersweet: '#b8a0c8',
   raw: '#c46060',
 };
+
+// ─── Background Music ───────────────────────────────────────────────────────
+// Plays a music file from the bundle's public/ directory with volume fade-in/out.
+
+export const BackgroundMusic: React.FC<{
+  musicFile?: string;
+  volume?: number;
+  fadeDuration?: number;
+}> = ({ musicFile, volume = 0.3, fadeDuration = 30 }) => {
+  const { durationInFrames } = useVideoConfig();
+  if (!musicFile) return null;
+
+  return (
+    <Audio
+      src={staticFile(musicFile)}
+      volume={(f: number) => {
+        if (f < fadeDuration) return (f / fadeDuration) * volume;
+        const fadeOutStart = durationInFrames - fadeDuration;
+        if (f > fadeOutStart) return ((durationInFrames - f) / fadeDuration) * volume;
+        return volume;
+      }}
+    />
+  );
+};
+
+// ─── Loop Fade ──────────────────────────────────────────────────────────────
+// Opacity multiplier that fades from black at start and to black at end,
+// creating a seamless dark-to-dark loop point for autoplay replays.
+
+export function useLoopFade(fadeInFrames = 15, fadeOutFrames = 18): number {
+  const frame = useCurrentFrame();
+  const { durationInFrames } = useVideoConfig();
+
+  const fadeIn = interpolate(frame, [0, fadeInFrames], [0, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  });
+  const fadeOut = interpolate(
+    frame,
+    [durationInFrames - fadeOutFrames, durationInFrames],
+    [1, 0],
+    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
+  );
+  return Math.min(fadeIn, fadeOut);
+}
+
+// ─── Content-Adaptive Duration ──────────────────────────────────────────────
+// Calculates duration in frames based on word count.
+// Short messages → shorter videos, long messages → longer (6–15 seconds).
+
+export function calculateDurationFrames(content: string, fps = 30): number {
+  const wordCount = content.split(/\s+/).filter(Boolean).length;
+  const durationSec = Math.min(Math.max(4 + wordCount * 0.25, 6), 15);
+  return Math.ceil(durationSec * fps);
+}

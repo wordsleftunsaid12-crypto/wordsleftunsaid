@@ -30,6 +30,8 @@ export interface RenderOptions {
     to: string;
     content: string;
     backgroundVideo?: string;
+    /** Music filename (relative to public/) for templates using <Audio> */
+    musicFile?: string;
     ctaLine1?: string;
     ctaLine2?: string;
     mood?: string;
@@ -45,6 +47,17 @@ export interface RenderOptions {
 
 export function isCinematic(compositionId: CompositionId): boolean {
   return compositionId.startsWith('Cinematic');
+}
+
+export function needsBackgroundVideo(compositionId: CompositionId): boolean {
+  return compositionId.startsWith('Cinematic')
+    || compositionId.startsWith('POV')
+    || compositionId.startsWith('Modern');
+}
+
+export function needsMusicFile(compositionId: CompositionId): boolean {
+  return !compositionId.startsWith('Cinematic')
+    && !compositionId.startsWith('VoiceNarration');
 }
 
 /** Cached bundle URL — avoids re-bundling for every video in a batch */

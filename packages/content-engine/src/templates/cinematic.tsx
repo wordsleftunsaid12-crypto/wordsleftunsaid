@@ -8,6 +8,7 @@ import {
   useVideoConfig,
   Easing,
 } from 'remotion';
+import { useLoopFade } from './template-utils';
 
 export interface CinematicProps {
   from: string;
@@ -29,6 +30,7 @@ export const CinematicMessage: React.FC<CinematicProps> = ({
   const frame = useCurrentFrame();
   const { height, durationInFrames } = useVideoConfig();
   const isVertical = height > 1200;
+  const loopFade = useLoopFade();
 
   // --- Animation timing (compressed for faster hook) ---
   const toDelay = 5;
@@ -147,7 +149,7 @@ export const CinematicMessage: React.FC<CinematicProps> = ({
   const contentFontSize = isVertical ? 68 : 52;
 
   return (
-    <AbsoluteFill style={{ backgroundColor: '#0a0908' }}>
+    <AbsoluteFill style={{ backgroundColor: '#0a0908', opacity: loopFade }}>
       {/* Background video */}
       <AbsoluteFill>
         <Video

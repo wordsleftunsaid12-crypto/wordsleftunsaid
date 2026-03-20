@@ -7,7 +7,7 @@ import {
   Easing,
 } from 'remotion';
 import type { MessageProps } from '../compositions/Root';
-import { FilmGrain, CTASection, useFadeIn } from './template-utils';
+import { FilmGrain, CTASection, useFadeIn, BackgroundMusic, useLoopFade } from './template-utils';
 
 /**
  * Typewriter — raw, confessional template.
@@ -22,10 +22,12 @@ export const TypewriterMessage: React.FC<MessageProps> = ({
   from,
   to,
   content,
+  musicFile,
 }) => {
   const frame = useCurrentFrame();
-  const { height } = useVideoConfig();
+  const { height, durationInFrames } = useVideoConfig();
   const isVertical = height > 1200;
+  const loopFade = useLoopFade();
 
   // --- Animation timing ---
   // Blinking cursor on empty screen (frames 0-30) — the hook
@@ -60,21 +62,16 @@ export const TypewriterMessage: React.FC<MessageProps> = ({
   const ctaDelay = fromDelay + 30;
   const ctaAnim = useFadeIn(ctaDelay, 20);
 
-  // Fade out
-  const fadeOut = interpolate(frame, [210, 240], [1, 0], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  });
-
   const contentFontSize = isVertical ? 56 : 42;
 
   return (
     <AbsoluteFill
       style={{
         backgroundColor: '#000000',
-        opacity: fadeOut,
+        opacity: loopFade,
       }}
     >
+      <BackgroundMusic musicFile={musicFile} />
       {/* Subtle scanline/grain effect */}
       <FilmGrain opacity={0.03} blendMode="overlay" />
 

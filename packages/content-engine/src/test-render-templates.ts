@@ -32,7 +32,7 @@ const TEMPLATES: Array<{
   { id: 'CinematicVertical', skip: 'requires background video file' },
   { id: 'ClassicVertical' },
   { id: 'ModernVertical' },
-  { id: 'VoiceNarrationVertical', skip: 'requires TTS audio file' },
+  { id: 'VoiceNarrationVertical' },
 ];
 
 async function main() {

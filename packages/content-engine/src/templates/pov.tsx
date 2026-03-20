@@ -1,16 +1,21 @@
 import React from 'react';
 import {
   AbsoluteFill,
+  Video,
+  staticFile,
   interpolate,
   useCurrentFrame,
   useVideoConfig,
   Easing,
 } from 'remotion';
+import { BackgroundMusic, useLoopFade } from './template-utils';
 
 export interface POVProps {
   from: string;
   to: string;
   content: string;
+  backgroundVideo?: string;
+  musicFile?: string;
   ctaLine1?: string;
   ctaLine2?: string;
 }
@@ -26,12 +31,15 @@ export interface POVProps {
 export const POVMessage: React.FC<POVProps> = ({
   from,
   content,
+  backgroundVideo,
+  musicFile,
   ctaLine1,
   ctaLine2,
 }) => {
   const frame = useCurrentFrame();
-  const { height } = useVideoConfig();
+  const { height, durationInFrames } = useVideoConfig();
   const isVertical = height > 1200;
+  const loopFade = useLoopFade();
 
   // --- Animation timing (240 frames = 8 seconds) ---
   // Hook: visible on frame 0, fades out by frame 60
@@ -62,12 +70,13 @@ export const POVMessage: React.FC<POVProps> = ({
     easing: Easing.out(Easing.cubic),
   });
 
-  // CTA
-  const ctaOpacity = interpolate(frame, [165, 190], [0, 1], {
+  // CTA — relative to end
+  const ctaStart = Math.max(165, durationInFrames - 75);
+  const ctaOpacity = interpolate(frame, [ctaStart, ctaStart + 25], [0, 1], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
-  const ctaSlide = interpolate(frame, [165, 188], [20, 0], {
+  const ctaSlide = interpolate(frame, [ctaStart, ctaStart + 23], [20, 0], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
     easing: Easing.out(Easing.cubic),
@@ -76,11 +85,11 @@ export const POVMessage: React.FC<POVProps> = ({
   // Ambient glow animation
   const glowOpacity = interpolate(
     frame,
-    [0, 80, 160, 240],
+    [0, 80, 160, durationInFrames],
     [0.08, 0.18, 0.12, 0.08],
     { extrapolateRight: 'clamp' },
   );
-  const glowScale = interpolate(frame, [0, 240], [0.9, 1.1], {
+  const glowScale = interpolate(frame, [0, durationInFrames], [0.9, 1.1], {
     extrapolateRight: 'clamp',
   });
 
@@ -97,8 +106,33 @@ export const POVMessage: React.FC<POVProps> = ({
     <AbsoluteFill
       style={{
         background: 'linear-gradient(170deg, #0a0908 0%, #1a1412 50%, #0d0b0a 100%)',
+        opacity: loopFade,
       }}
     >
+      <BackgroundMusic musicFile={musicFile} />
+      {/* Optional background video */}
+      {backgroundVideo && (
+        <>
+          <AbsoluteFill>
+            <Video
+              src={staticFile(backgroundVideo)}
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
+          </AbsoluteFill>
+          {/* Dark overlay for text readability */}
+          <AbsoluteFill
+            style={{
+              background: `linear-gradient(
+                180deg,
+                rgba(0, 0, 0, 0.4) 0%,
+                rgba(0, 0, 0, 0.6) 40%,
+                rgba(0, 0, 0, 0.7) 70%,
+                rgba(0, 0, 0, 0.8) 100%
+              )`,
+            }}
+          />
+        </>
+      )}
       {/* Ambient warm glow behind text */}
       <div
         style={{

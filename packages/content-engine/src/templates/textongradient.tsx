@@ -7,7 +7,7 @@ import {
   Easing,
 } from 'remotion';
 import type { MessageProps } from '../compositions/Root';
-import { FilmGrain, Vignette, CTASection, MOOD_COLORS } from './template-utils';
+import { FilmGrain, Vignette, CTASection, MOOD_COLORS, BackgroundMusic, useLoopFade } from './template-utils';
 
 export interface TextOnGradientProps extends MessageProps {
   mood?: string;
@@ -26,10 +26,12 @@ export const TextOnGradientMessage: React.FC<TextOnGradientProps> = ({
   from,
   content,
   mood = 'tender',
+  musicFile,
 }) => {
   const frame = useCurrentFrame();
-  const { height } = useVideoConfig();
+  const { height, durationInFrames } = useVideoConfig();
   const isVertical = height > 1200;
+  const loopFade = useLoopFade();
 
   const bgColor = MOOD_COLORS[mood] ?? MOOD_COLORS.tender;
 
@@ -56,21 +58,16 @@ export const TextOnGradientMessage: React.FC<TextOnGradientProps> = ({
     easing: Easing.out(Easing.cubic),
   });
 
-  // CTA (frames 140-165)
-  const ctaOpacity = interpolate(frame, [140, 165], [0, 1], {
+  // CTA — relative to end
+  const ctaStart = Math.max(100, durationInFrames - 100);
+  const ctaOpacity = interpolate(frame, [ctaStart, ctaStart + 25], [0, 1], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
-  const ctaSlide = interpolate(frame, [140, 163], [15, 0], {
+  const ctaSlide = interpolate(frame, [ctaStart, ctaStart + 23], [15, 0], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
     easing: Easing.out(Easing.cubic),
-  });
-
-  // Fade out (frames 210-240)
-  const fadeOut = interpolate(frame, [210, 240], [1, 0], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
   });
 
   const contentFontSize = isVertical ? 72 : 54;
@@ -79,9 +76,10 @@ export const TextOnGradientMessage: React.FC<TextOnGradientProps> = ({
     <AbsoluteFill
       style={{
         backgroundColor: bgColor,
-        opacity: fadeOut,
+        opacity: loopFade,
       }}
     >
+      <BackgroundMusic musicFile={musicFile} />
       {/* Subtle grain for texture */}
       <FilmGrain opacity={0.04} blendMode="multiply" />
 

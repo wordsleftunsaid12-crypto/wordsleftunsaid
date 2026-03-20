@@ -7,7 +7,7 @@ import {
   Easing,
 } from 'remotion';
 import type { MessageProps } from '../compositions/Root';
-import { FilmGrain, Vignette, useFadeIn, useFadeOut } from './template-utils';
+import { FilmGrain, Vignette, useFadeIn, useFadeOut, BackgroundMusic, useLoopFade } from './template-utils';
 
 /**
  * Handwritten — personal, discovered-letter template.
@@ -22,10 +22,12 @@ export const HandwrittenMessage: React.FC<MessageProps> = ({
   from,
   to,
   content,
+  musicFile,
 }) => {
   const frame = useCurrentFrame();
-  const { height } = useVideoConfig();
+  const { height, durationInFrames } = useVideoConfig();
   const isVertical = height > 1200;
+  const loopFade = useLoopFade();
 
   // --- Animation timing ---
   // "Dear [to]," visible on frame 0 — the hook
@@ -49,7 +51,7 @@ export const HandwrittenMessage: React.FC<MessageProps> = ({
   const closingAnim = useFadeIn(100, 25);
 
   // Watermark branding — subtle, bottom
-  const brandOpacity = interpolate(frame, [130, 155, 210, 240], [0, 0.3, 0.3, 0], {
+  const brandOpacity = interpolate(frame, [130, 155, durationInFrames - 30, durationInFrames], [0, 0.3, 0.3, 0], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
@@ -60,21 +62,16 @@ export const HandwrittenMessage: React.FC<MessageProps> = ({
     extrapolateRight: 'clamp',
   });
 
-  // Fade out
-  const fadeOut = interpolate(frame, [210, 240], [1, 0], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  });
-
   const contentFontSize = isVertical ? 64 : 48;
 
   return (
     <AbsoluteFill
       style={{
         background: 'linear-gradient(175deg, #f5eede 0%, #efe5d4 50%, #e8dcc8 100%)',
-        opacity: fadeOut,
+        opacity: loopFade,
       }}
     >
+      <BackgroundMusic musicFile={musicFile} />
       {/* Paper grain texture */}
       <FilmGrain opacity={0.06} blendMode="multiply" />
 

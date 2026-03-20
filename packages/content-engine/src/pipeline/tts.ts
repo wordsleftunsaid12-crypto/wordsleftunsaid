@@ -16,16 +16,21 @@ const execFileAsync = promisify(execFile);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TTS_OUTPUT_DIR = path.resolve(__dirname, '../../output/tts');
 
-/** Default voice — warm, natural female */
-const DEFAULT_VOICE = 'en-US-AriaNeural';
+/** Voice options — newer Multilingual generation sounds more natural */
+const VOICES = {
+  male: 'en-US-BrianMultilingualNeural',
+  female: 'en-US-AvaMultilingualNeural',
+} as const;
 
-/** Mood-to-voice-style mapping for emotional variation */
-const MOOD_STYLES: Record<string, string> = {
-  tender: 'whispering',
-  regretful: 'sad',
-  hopeful: 'hopeful',
-  bittersweet: 'sad',
-  raw: 'angry',
+type VoiceGender = keyof typeof VOICES;
+
+/** Mood-to-rate mapping for emotional pacing */
+const MOOD_RATE: Record<string, string> = {
+  tender: '-15%',
+  regretful: '-20%',
+  hopeful: '-5%',
+  bittersweet: '-10%',
+  raw: '+0%',
 };
 
 export interface WordTiming {
@@ -49,6 +54,7 @@ export interface TTSResult {
 export async function generateTTS(
   content: string,
   mood: MessageMood = 'bittersweet',
+  voiceGender: VoiceGender = 'male',
 ): Promise<TTSResult> {
   if (!fs.existsSync(TTS_OUTPUT_DIR)) {
     fs.mkdirSync(TTS_OUTPUT_DIR, { recursive: true });
@@ -58,26 +64,19 @@ export async function generateTTS(
   const audioPath = path.join(TTS_OUTPUT_DIR, `tts-${timestamp}.mp3`);
   const subsPath = path.join(TTS_OUTPUT_DIR, `tts-${timestamp}.vtt`);
 
-  const voice = DEFAULT_VOICE;
-  const style = MOOD_STYLES[mood] ?? 'chat';
+  const voice = VOICES[voiceGender];
+  const rate = MOOD_RATE[mood] ?? '-10%';
 
-  // Build SSML for styled speech
-  const ssml = buildSSML(content, voice, style);
-  const ssmlPath = path.join(TTS_OUTPUT_DIR, `tts-${timestamp}.xml`);
-  fs.writeFileSync(ssmlPath, ssml);
+  console.log(`  Generating TTS (voice: ${voice}, rate: ${rate})...`);
 
-  console.log(`  Generating TTS (voice: ${voice}, style: ${style})...`);
-
-  try {
-    await execFileAsync('edge-tts', [
-      '--file', ssmlPath,
-      '--write-media', audioPath,
-      '--write-subtitles', subsPath,
-    ]);
-  } finally {
-    // Clean up SSML temp file
-    try { fs.unlinkSync(ssmlPath); } catch { /* ignore */ }
-  }
+  await execFileAsync('edge-tts', [
+    '--text', content,
+    '--voice', voice,
+    '--rate', rate,
+    '--pitch', '-2Hz',
+    '--write-media', audioPath,
+    '--write-subtitles', subsPath,
+  ]);
 
   // Parse word timings from WebVTT subtitles
   const wordTimings = parseVTTTimings(subsPath, content);
@@ -101,32 +100,6 @@ export async function generateTTS(
     durationFrames,
     wordTimings,
   };
-}
-
-/**
- * Build SSML with voice style for emotional variation.
- */
-function buildSSML(text: string, voice: string, style: string): string {
-  // Edge TTS supports express-as styles for AriaNeural
-  return `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis"
-  xmlns:mstts="https://www.w3.org/2001/mstts"
-  xml:lang="en-US">
-  <voice name="${voice}">
-    <mstts:express-as style="${style}">
-      <prosody rate="-10%" pitch="-2%">
-        ${escapeXml(text)}
-      </prosody>
-    </mstts:express-as>
-  </voice>
-</speak>`;
-}
-
-function escapeXml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
 }
 
 /**

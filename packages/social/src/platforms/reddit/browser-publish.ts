@@ -56,6 +56,12 @@ export async function browserPublishReddit(options: {
     : 'An unsent letter';
 
   const body = options.messageContent ?? options.caption.split('\n')[0];
+
+  // Reddit posts need substance — one-liners look like spam and get removed
+  if (body.length < 100) {
+    throw new Error(`Message too short for Reddit (${body.length} chars, min 100). Skipping.`);
+  }
+
   // No promotional footer — Reddit bans for self-promotion.
   // Website link belongs in profile bio only.
   const attribution = options.messageFrom ? `\n\n\u2014 *${options.messageFrom}*` : '';

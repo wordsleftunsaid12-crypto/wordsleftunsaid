@@ -52,7 +52,8 @@ export async function browserPublishPinterest(options: {
     if (videoPath && existsSync(videoPath)) {
       const autocover = videoPath.replace(/\.mp4$/i, '-cover.png');
       console.log('[pinterest-publish] No cover image found, extracting from video...');
-      await execFileAsync('ffmpeg', ['-y', '-ss', '0', '-i', videoPath, '-vframes', '1', '-q:v', '1', autocover]);
+      // Extract at ~0.67s (frame 20 at 30fps) to get past the loop fade-in from black
+      await execFileAsync('ffmpeg', ['-y', '-ss', '0.67', '-i', videoPath, '-vframes', '1', '-q:v', '1', autocover]);
       imagePath = autocover;
       console.log(`[pinterest-publish] Cover extracted: ${basename(autocover)}`);
     } else {

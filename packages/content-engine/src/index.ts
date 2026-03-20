@@ -2,7 +2,7 @@ import 'dotenv/config';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import { renderVideo, extractCoverFromVideo, isCinematic, needsBackgroundVideo, needsMusicFile, ensureBundle, copyToBundle } from './pipeline/render.js';
+import { renderVideo, extractCoverFromVideo, isCinematic, needsBackgroundVideo, needsMusicFile, getCoverFrame, ensureBundle, copyToBundle } from './pipeline/render.js';
 import type { CompositionId } from './pipeline/render.js';
 import { detectMood } from './pipeline/mood.js';
 import { calculateDurationFrames } from './templates/template-utils.js';
@@ -176,7 +176,7 @@ async function main() {
 
       // Extract cover frame from the rendered video (guaranteed to match)
       const coverPath = outputPath.replace('.mp4', '-cover.png');
-      await extractCoverFromVideo(outputPath, coverPath);
+      await extractCoverFromVideo(outputPath, coverPath, getCoverFrame(template));
 
       if (backgroundVideo) cleanupBgVideo(backgroundVideo);
 
@@ -267,7 +267,7 @@ async function main() {
           });
 
           const coverPath = outputPath.replace('.mp4', '-cover.png');
-          await extractCoverFromVideo(outputPath, coverPath);
+          await extractCoverFromVideo(outputPath, coverPath, getCoverFrame(template));
 
           if (backgroundVideo) cleanupBgVideo(backgroundVideo);
           successCount++;
@@ -407,7 +407,7 @@ async function main() {
 
         // Extract cover frame from the rendered video (guaranteed to match)
         const coverPath = outputPath.replace('.mp4', '-cover.png');
-        await extractCoverFromVideo(outputPath, coverPath);
+        await extractCoverFromVideo(outputPath, coverPath, getCoverFrame(videoTemplate));
 
         if (backgroundVideo) cleanupBgVideo(backgroundVideo);
 
@@ -510,7 +510,7 @@ async function main() {
 
         // Extract cover frame from the rendered video (guaranteed to match)
         const newCoverPath = newOutputPath.replace('.mp4', '-cover.png');
-        await extractCoverFromVideo(newOutputPath, newCoverPath);
+        await extractCoverFromVideo(newOutputPath, newCoverPath, getCoverFrame(template));
 
         if (backgroundVideo) cleanupBgVideo(backgroundVideo);
 

@@ -50,5 +50,5 @@ export const MAX_CONTENT_LENGTH: Record<string, number> = {
   TextOnGradientVertical: 120,
   TypewriterVertical: 180,
   HandwrittenVertical: 140,
-  VoiceNarrationVertical: 9999, // no limit — duration adapts
+  VoiceNarrationVertical: 500, // adaptive font sizing handles up to ~500 chars
 };

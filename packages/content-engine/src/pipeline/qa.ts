@@ -199,6 +199,13 @@ async function extractKeyFrames(
 
 // ─── Metadata Checks ─────────────────────────────────────────────────────────
 
+/** Per-template expected duration ranges (seconds). */
+function getDurationRange(template: string): { min: number; max: number } {
+  if (template.startsWith('VoiceNarration')) return { min: 3, max: 120 };
+  // All other templates use adaptive duration (calculateDurationFrames: 6-15s)
+  return { min: 5, max: 17 };
+}
+
 function runMetadataChecks(metadata: VideoMetadata, template: string): QACheck[] {
   const isVertical = template.includes('Vertical');
   const expectedWidth = 1080;
@@ -206,6 +213,7 @@ function runMetadataChecks(metadata: VideoMetadata, template: string): QACheck[]
   // Text-only templates (POV) are lighter than cinematic (no background video)
   const minFileSize = template.startsWith('POV') ? 500_000 : 1_000_000;
   const minLabel = template.startsWith('POV') ? '0.5MB' : '1MB';
+  const durationRange = getDurationRange(template);
 
   return [
     {
@@ -216,8 +224,8 @@ function runMetadataChecks(metadata: VideoMetadata, template: string): QACheck[]
     },
     {
       name: 'duration',
-      passed: metadata.durationSec >= 7.0 && metadata.durationSec <= 9.0,
-      expected: '7.0-9.0s',
+      passed: metadata.durationSec >= durationRange.min && metadata.durationSec <= durationRange.max,
+      expected: `${durationRange.min}-${durationRange.max}s`,
       actual: `${metadata.durationSec.toFixed(1)}s`,
     },
     {
@@ -269,6 +277,18 @@ export async function runQA(
 
   // Run metadata checks
   const checks = runMetadataChecks(metadata, template);
+
+  // Content length check — catch messages too long for their template
+  if (content) {
+    const { MAX_CONTENT_LENGTH } = await import('@wlu/shared');
+    const maxLen = MAX_CONTENT_LENGTH[template] ?? 160;
+    checks.push({
+      name: 'content-length',
+      passed: content.length <= maxLen,
+      expected: `<=${maxLen} chars`,
+      actual: `${content.length} chars`,
+    });
+  }
 
   // Extract key frames (only if content is provided for timing computation)
   let frameScreenshots: FrameCapture[] = [];

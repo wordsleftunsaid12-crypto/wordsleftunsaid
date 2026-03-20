@@ -109,7 +109,13 @@ export const VoiceNarrationMessage: React.FC<VoiceNarrationProps> = ({
     extrapolateRight: 'clamp',
   });
 
-  const contentFontSize = isVertical ? 62 : 48;
+  // Adaptive font sizing — scale down for longer messages, floor at 42px (still very readable)
+  const charCount = content.length;
+  const contentFontSize = isVertical
+    ? Math.max(42, Math.round(interpolate(charCount, [0, 150, 400], [62, 62, 42], { extrapolateRight: 'clamp' })))
+    : Math.max(36, Math.round(interpolate(charCount, [0, 150, 400], [48, 48, 36], { extrapolateRight: 'clamp' })));
+  // Tighter line-height for smaller fonts to use space efficiently
+  const contentLineHeight = contentFontSize >= 56 ? 1.6 : 1.5;
 
   return (
     <AbsoluteFill
@@ -150,7 +156,7 @@ export const VoiceNarrationMessage: React.FC<VoiceNarrationProps> = ({
           alignItems: 'center',
           height: '100%',
           padding: isVertical
-            ? '250px 90px 400px 90px'
+            ? `${charCount > 250 ? 200 : 250}px 90px ${charCount > 250 ? 320 : 400}px 90px`
             : '100px 60px 180px 60px',
         }}
       >
@@ -160,7 +166,7 @@ export const VoiceNarrationMessage: React.FC<VoiceNarrationProps> = ({
             fontFamily: 'Poppins, sans-serif',
             fontSize: contentFontSize,
             fontWeight: 400,
-            lineHeight: 1.6,
+            lineHeight: contentLineHeight,
             color: '#f0e8e0',
             textAlign: 'center',
             maxWidth: isVertical ? 860 : 800,

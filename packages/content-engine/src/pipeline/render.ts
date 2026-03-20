@@ -60,6 +60,20 @@ export function needsMusicFile(compositionId: CompositionId): boolean {
     && !compositionId.startsWith('VoiceNarration');
 }
 
+/**
+ * Get the best frame number for cover/thumbnail extraction.
+ * All templates use useLoopFade() which fades from black over 15 frames,
+ * so frame 0 is completely black. We pick a frame where content is visible.
+ */
+export function getCoverFrame(compositionId: CompositionId): number {
+  // VoiceNarration: words start at frame 30 (audioStartFrame), pick frame 45
+  // so a few words are visible as the hook
+  if (compositionId.startsWith('VoiceNarration')) return 45;
+  // All other templates: content appears at frame 15 (contentDelay),
+  // pick frame 20 to be safely past both loop fade and content delay
+  return 20;
+}
+
 /** Cached bundle URL — avoids re-bundling for every video in a batch */
 let cachedBundleUrl: string | null = null;
 /** In-flight bundling promise — serializes concurrent calls */

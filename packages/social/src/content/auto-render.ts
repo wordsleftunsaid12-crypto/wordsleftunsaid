@@ -13,7 +13,6 @@ import {
   getApprovedMessages,
   getUsedMessageIds,
   createApprovedMessage,
-  MAX_VIDEO_CONTENT_LENGTH,
   notifyMessageBecameVideo,
 } from '@wlu/shared';
 import { MESSAGE_POOL } from './message-seeder.js';
@@ -46,13 +45,13 @@ async function ensureUnusedMessages(needed: number): Promise<number> {
   ]);
 
   const usedSet = new Set(usedIds);
-  // Only count messages short enough for video rendering
+  // Count unused messages (render-next handles template-message length matching)
   const unused = allMessages.filter(
-    (m) => !usedSet.has(m.id) && m.content.length <= MAX_VIDEO_CONTENT_LENGTH,
+    (m) => !usedSet.has(m.id),
   );
 
   if (unused.length >= needed) {
-    console.log(`[auto-render] ${unused.length} unused messages available (≤${MAX_VIDEO_CONTENT_LENGTH} chars)`);
+    console.log(`[auto-render] ${unused.length} unused messages available`);
     return 0;
   }
 
@@ -64,8 +63,7 @@ async function ensureUnusedMessages(needed: number): Promise<number> {
     allMessages.map((m) => m.content.toLowerCase().trim()),
   );
   const available = MESSAGE_POOL.filter(
-    (t) => !existingContents.has(t.content.toLowerCase().trim())
-      && t.content.length <= MAX_VIDEO_CONTENT_LENGTH,
+    (t) => !existingContents.has(t.content.toLowerCase().trim()),
   );
 
   if (available.length === 0) {

@@ -8,7 +8,6 @@ import {
   createPost,
   getPostCountToday,
   hasPostForMessages,
-  MAX_VIDEO_CONTENT_LENGTH,
 } from '@wlu/shared';
 import type { Platform } from '@wlu/shared';
 import { launchThreads } from '../platforms/threads/browser.js';
@@ -38,9 +37,6 @@ export async function postStandaloneThread(options: {
   const candidates: typeof allMessages = [];
 
   for (const msg of allMessages) {
-    // Skip messages too long for video (keep consistent with video content)
-    if (msg.content.length > MAX_VIDEO_CONTENT_LENGTH) continue;
-
     const alreadyPosted = await hasPostForMessages('threads' as Platform, [msg.id]);
     if (!alreadyPosted) {
       candidates.push(msg);

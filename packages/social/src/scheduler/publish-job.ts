@@ -66,13 +66,13 @@ export async function publishNextScheduled(
     }
 
     // Guard: reject items with message content too long for their specific template
-    const templateMaxLen = MAX_CONTENT_LENGTH[item.compositionId ?? ''] ?? 160;
+    const templateMaxLen = MAX_CONTENT_LENGTH[item.template ?? ''] ?? 160;
     if (sourceMessage && sourceMessage.content.length > templateMaxLen) {
       console.warn(
-        `[publish-job] Message too long (${sourceMessage.content.length} > ${templateMaxLen} chars for ${item.compositionId}), marking as failed: ${item.id}`,
+        `[publish-job] Message too long (${sourceMessage.content.length} > ${templateMaxLen} chars for ${item.template}), marking as failed: ${item.id}`,
       );
       await updateContentQueueStatus(item.id, 'failed', {
-        errorMessage: `Message content too long (${sourceMessage.content.length} chars, max ${templateMaxLen} for ${item.compositionId})`,
+        errorMessage: `Message content too long (${sourceMessage.content.length} chars, max ${templateMaxLen} for ${item.template})`,
       });
       return false;
     }

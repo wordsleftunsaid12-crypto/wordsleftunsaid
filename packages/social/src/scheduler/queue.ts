@@ -177,6 +177,20 @@ async function getPreferredPostingHours(
 }
 
 /**
+ * Get the next available posting slot for a platform.
+ * Used by cross-posting to schedule at a proper preferred hour
+ * instead of immediately.
+ */
+export async function getNextSlotForPlatform(platform: Platform): Promise<Date> {
+  const preferredHours = await getPreferredPostingHours(platform);
+  const slots = computeNextSlots(preferredHours, 1);
+  if (slots.length > 0) return slots[0];
+
+  // Fallback: 2 hours from now if no preferred slots found
+  return new Date(Date.now() + 2 * 3600000);
+}
+
+/**
  * Catch up missed slots after the computer was off.
  * Reschedules overdue items to the next available preferred-hour slots.
  */

@@ -204,7 +204,7 @@ export async function getTotalPostCount(platform: Platform): Promise<number> {
 export async function getPostCountToday(platform: Platform): Promise<number> {
   const client = getServiceClient();
   const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  today.setUTCHours(0, 0, 0, 0);
 
   const { count, error } = await client
     .from('posts')
@@ -217,12 +217,31 @@ export async function getPostCountToday(platform: Platform): Promise<number> {
 }
 
 /**
+ * Get the timestamp of the most recent post for a platform (or null if none today).
+ */
+export async function getLastPostTime(platform: Platform): Promise<Date | null> {
+  const client = getServiceClient();
+  const { data, error } = await client
+    .from('posts')
+    .select('posted_at')
+    .eq('platform', platform)
+    .order('posted_at', { ascending: false })
+    .limit(1)
+    .single();
+
+  if (error && error.code !== 'PGRST116') {
+    throw new Error(`Failed to get last post time: ${error.message}`);
+  }
+  return data ? new Date(data.posted_at as string) : null;
+}
+
+/**
  * Get posts from today for a specific platform.
  */
 export async function getTodayPosts(platform?: Platform): Promise<Post[]> {
   const client = getServiceClient();
   const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  today.setUTCHours(0, 0, 0, 0);
 
   let query = client
     .from('posts')

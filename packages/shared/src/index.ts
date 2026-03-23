@@ -63,6 +63,7 @@ export {
   getPostsByPlatform,
   getRecentPosts,
   getPostCountToday,
+  getLastPostTime,
   getTotalPostCount,
   saveEngagementMetrics,
   getLatestMetrics,

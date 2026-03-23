@@ -5,11 +5,16 @@ import {
   hasPostForMessages,
   hasQueueItemForMessages,
   getMessageById,
+  getLastPostTime,
   MAX_CONTENT_LENGTH,
 } from '@wlu/shared';
 import type { Message, Platform } from '@wlu/shared';
 import { browserPublishReel } from '../platforms/instagram/browser-publish.js';
 import { buildUtmUrl } from '../utils/utm.js';
+import { getNextSlotForPlatform } from './queue.js';
+
+/** Minimum hours between posts on the same platform. */
+const MIN_POST_INTERVAL_HOURS = 2;
 
 /** Platforms to auto-cross-post to after a successful publish. */
 const CROSS_POST_TARGETS: Record<string, string[]> = {
@@ -48,6 +53,19 @@ export async function publishNextScheduled(
 
   if (!item) {
     return false;
+  }
+
+  // Enforce minimum interval between posts on the same platform
+  const lastPostTime = await getLastPostTime(platform);
+  if (lastPostTime) {
+    const hoursSinceLastPost = (Date.now() - lastPostTime.getTime()) / 3600000;
+    if (hoursSinceLastPost < MIN_POST_INTERVAL_HOURS) {
+      const waitMins = Math.ceil((MIN_POST_INTERVAL_HOURS - hoursSinceLastPost) * 60);
+      console.log(
+        `[publish-job] Skipping ${platform} — last post ${Math.round(hoursSinceLastPost * 60)}m ago, need ${MIN_POST_INTERVAL_HOURS}h gap (${waitMins}m remaining)`,
+      );
+      return false;
+    }
   }
 
   console.log(`[publish-job] Publishing: ${item.id} (scheduled for ${item.scheduledFor})`);
@@ -179,12 +197,13 @@ export async function publishNextScheduled(
           platform: targetPlatform,
           isExploration: item.isExploration,
         });
+        const nextSlot = await getNextSlotForPlatform(targetPlatform);
         await updateContentQueueStatus(crossPost.id, 'scheduled', {
           caption: item.caption ?? undefined,
           hashtags: item.hashtags ?? undefined,
-          scheduledFor: new Date().toISOString(),
+          scheduledFor: nextSlot.toISOString(),
         });
-        console.log(`[publish-job] Cross-posted → ${target} queue (${crossPost.id.slice(0, 8)})`);
+        console.log(`[publish-job] Cross-posted → ${target} scheduled for ${nextSlot.toISOString()} (${crossPost.id.slice(0, 8)})`);
       } catch (err) {
         console.warn(`[publish-job] Cross-post to ${target} failed:`, err instanceof Error ? err.message : err);
       }

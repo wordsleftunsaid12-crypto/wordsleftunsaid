@@ -1,0 +1,8 @@
+- All video content must be within the **social media safe zone**: top 15% and bottom 300px are overlay zones
+- Instagram/TikTok/YouTube Shorts overlay controls (like, comment, share, description) cover the bottom ~300px
+- Platform headers/status bars cover the top ~15% of the screen
+- For 1080x1920 videos, safe content area is roughly y=290 to y=1620
+- Never place important text, CTA, or interactive elements (input fields, buttons) in the overlay zones
+- CTA positioning: use `bottom: 340` minimum (above overlay) or center in the safe zone
+- When designing new templates, always verify key frames against overlay zones
+- Static elements (backgrounds, gradients, decorative items) can extend into overlay zones

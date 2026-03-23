@@ -65,7 +65,7 @@ export async function browserPublishThreads(options: {
 
   try {
     console.log('[threads-publish] Composing thread...');
-    await composeThread(page, threadText);
+    await composeThread(page, threadText, options.coverImagePath);
 
     console.log('[threads-publish] Thread posted successfully!');
 
@@ -96,7 +96,7 @@ export async function browserPublishThreads(options: {
 /**
  * Compose and post a thread via Threads' web UI.
  */
-export async function composeThread(page: Page, text: string): Promise<void> {
+export async function composeThread(page: Page, text: string, imagePath?: string): Promise<void> {
   // Click the create/compose button
   const createBtn = page
     .locator('[aria-label="Create"], [aria-label="New thread"], svg[aria-label="Create"]')
@@ -105,6 +105,15 @@ export async function composeThread(page: Page, text: string): Promise<void> {
   await page.waitForTimeout(2000);
 
   await page.screenshot({ path: '/tmp/threads-compose.png' }).catch(() => {});
+
+  // Attach image if provided
+  if (imagePath) {
+    console.log(`[threads-publish] Attaching image: ${imagePath}`);
+    const fileInput = page.locator('input[type="file"]').first();
+    await fileInput.setInputFiles(imagePath);
+    await page.waitForTimeout(3000);
+    console.log('[threads-publish] Image attached');
+  }
 
   // Type in the compose area
   const composeArea = page

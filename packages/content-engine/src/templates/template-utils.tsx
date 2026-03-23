@@ -94,7 +94,7 @@ export const CTASection: React.FC<{
       position: 'absolute',
       left: 0,
       right: 0,
-      bottom: isVertical ? 260 : 90,
+      bottom: isVertical ? 480 : 90,
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
@@ -302,14 +302,14 @@ export function useLoopFade(fadeInFrames = 15, fadeOutFrames = 18): number {
   const frame = useCurrentFrame();
   const { durationInFrames } = useVideoConfig();
 
-  const fadeIn = interpolate(frame, [0, fadeInFrames], [0, 1], {
+  const fadeIn = interpolate(frame, [0, fadeInFrames], [0.85, 1], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
   const fadeOut = interpolate(
     frame,
     [durationInFrames - fadeOutFrames, durationInFrames],
-    [1, 0],
+    [1, 0.85],
     { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
   );
   return Math.min(fadeIn, fadeOut);
@@ -321,6 +321,7 @@ export function useLoopFade(fadeInFrames = 15, fadeOutFrames = 18): number {
 
 export function calculateDurationFrames(content: string, fps = 30): number {
   const wordCount = content.split(/\s+/).filter(Boolean).length;
-  const durationSec = Math.min(Math.max(4 + wordCount * 0.25, 6), 15);
+  // 5s base + 0.12s per word, capped at 8s. Short and punchy for social media.
+  const durationSec = Math.min(Math.max(5, 5 + wordCount * 0.12), 8);
   return Math.ceil(durationSec * fps);
 }

@@ -41,30 +41,30 @@ export const POVMessage: React.FC<POVProps> = ({
   const isVertical = height > 1200;
   const loopFade = useLoopFade();
 
-  // --- Animation timing (240 frames = 8 seconds) ---
-  // Hook: visible on frame 0, fades out by frame 60
-  const hookOpacity = interpolate(frame, [0, 40, 50, 60], [1, 1, 0.5, 0], {
+  // --- Animation timing (fast for social media) ---
+  // Hook: visible on frame 0, fades to subtle presence after message appears
+  const hookOpacity = interpolate(frame, [0, 25, 35, 50], [1, 1, 0.6, 0.35], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
 
-  // Message: scales in from 0.92→1.0 with fade
-  const messageOpacity = interpolate(frame, [55, 80], [0, 1], {
+  // Message: scales in from 0.92→1.0 with fade (starts at frame 35)
+  const messageOpacity = interpolate(frame, [35, 55], [0, 1], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
-  const messageScale = interpolate(frame, [55, 80], [0.92, 1], {
+  const messageScale = interpolate(frame, [35, 55], [0.92, 1], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
     easing: Easing.out(Easing.cubic),
   });
 
   // "From" attribution
-  const fromOpacity = interpolate(frame, [110, 135], [0, 1], {
+  const fromOpacity = interpolate(frame, [75, 95], [0, 1], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
-  const fromSlide = interpolate(frame, [110, 135], [15, 0], {
+  const fromSlide = interpolate(frame, [75, 95], [15, 0], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
     easing: Easing.out(Easing.cubic),
@@ -94,7 +94,7 @@ export const POVMessage: React.FC<POVProps> = ({
   });
 
   // Accent line
-  const lineWidth = interpolate(frame, [47, 70], [0, isVertical ? 200 : 150], {
+  const lineWidth = interpolate(frame, [30, 50], [0, isVertical ? 200 : 150], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
     easing: Easing.out(Easing.cubic),
@@ -266,7 +266,7 @@ export const POVMessage: React.FC<POVProps> = ({
           position: 'absolute',
           left: 0,
           right: 0,
-          bottom: isVertical ? 250 : 80,
+          bottom: isVertical ? 340 : 80,
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',

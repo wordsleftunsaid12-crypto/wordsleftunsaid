@@ -172,37 +172,50 @@ async function createReelPost(
 
   // 5. Set cover image if provided
   if (coverImagePath && existsSync(coverImagePath)) {
-    try {
-      console.log('[browser-publish] Setting cover image...');
-      const editCover = page.getByText('Edit cover', { exact: false }).first();
-      if (await editCover.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await editCover.click();
-        await page.waitForTimeout(2000);
+    console.log('[browser-publish] Setting cover image...');
+    await page.screenshot({ path: '/tmp/ig-before-cover.png' }).catch(() => {});
 
-        // Click "Add from camera roll" to upload a custom cover
-        const addFromRoll = page.getByText('Add from camera roll', { exact: false })
-          .or(page.getByText('Upload cover photo', { exact: false }))
-          .first();
-        if (await addFromRoll.isVisible({ timeout: 3000 }).catch(() => false)) {
-          const [coverChooser] = await Promise.all([
-            page.waitForEvent('filechooser', { timeout: 10000 }),
-            addFromRoll.click(),
-          ]);
-          await coverChooser.setFiles(coverImagePath);
-          console.log(`[browser-publish] Cover image set: ${basename(coverImagePath)}`);
-          await page.waitForTimeout(3000);
+    const editCover = page.getByText('Edit cover', { exact: false }).first();
+    const editCoverVisible = await editCover.isVisible({ timeout: 5000 }).catch(() => false);
+    console.log(`[browser-publish] "Edit cover" visible: ${editCoverVisible}`);
 
-          // Confirm the cover selection
-          const doneBtn = page.getByRole('button', { name: /^Done$/i })
-            .or(page.locator('div[role="button"]').filter({ hasText: /^Done$/ }));
-          if (await doneBtn.first().isVisible({ timeout: 3000 }).catch(() => false)) {
-            await doneBtn.first().click({ force: true });
-            await page.waitForTimeout(2000);
-          }
+    if (editCoverVisible) {
+      await editCover.click();
+      await page.waitForTimeout(2000);
+      await page.screenshot({ path: '/tmp/ig-cover-editor.png' }).catch(() => {});
+
+      // Click "Add from camera roll" to upload a custom cover
+      const addFromRoll = page.getByText('Add from camera roll', { exact: false })
+        .or(page.getByText('Upload cover photo', { exact: false }))
+        .or(page.getByText('Add from Camera Roll', { exact: false }))
+        .first();
+      const addFromRollVisible = await addFromRoll.isVisible({ timeout: 5000 }).catch(() => false);
+      console.log(`[browser-publish] "Add from camera roll" visible: ${addFromRollVisible}`);
+
+      if (addFromRollVisible) {
+        const [coverChooser] = await Promise.all([
+          page.waitForEvent('filechooser', { timeout: 10000 }),
+          addFromRoll.click(),
+        ]);
+        await coverChooser.setFiles(coverImagePath);
+        console.log(`[browser-publish] Cover image set: ${basename(coverImagePath)}`);
+        await page.waitForTimeout(3000);
+
+        // Confirm the cover selection
+        const doneBtn = page.getByRole('button', { name: /^Done$/i })
+          .or(page.locator('div[role="button"]').filter({ hasText: /^Done$/ }));
+        if (await doneBtn.first().isVisible({ timeout: 3000 }).catch(() => false)) {
+          await doneBtn.first().click({ force: true });
+          await page.waitForTimeout(2000);
         }
+      } else {
+        console.warn('[browser-publish] COVER UPLOAD FAILED: "Add from camera roll" not found. Screenshot: /tmp/ig-cover-editor.png');
+        // Close the cover editor to get back to the caption step
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(1000);
       }
-    } catch (err) {
-      console.warn('[browser-publish] Cover image upload failed, continuing without it:', err instanceof Error ? err.message : err);
+    } else {
+      console.warn('[browser-publish] COVER UPLOAD SKIPPED: "Edit cover" button not found. Screenshot: /tmp/ig-before-cover.png');
     }
   }
 

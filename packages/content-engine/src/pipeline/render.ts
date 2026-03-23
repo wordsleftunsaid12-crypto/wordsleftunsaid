@@ -11,17 +11,14 @@ const execFileAsync = promisify(execFile);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export type CompositionId =
-  | 'ClassicVertical'
-  | 'ClassicSquare'
-  | 'ModernVertical'
-  | 'ModernSquare'
   | 'CinematicVertical'
   | 'CinematicSquare'
-  | 'POVVertical'
   | 'TextOnGradientVertical'
-  | 'TypewriterVertical'
-  | 'HandwrittenVertical'
-  | 'VoiceNarrationVertical';
+  | 'DeletedTextVertical'
+  | 'QuoteCardVertical'
+  | 'SplitScreenVertical'
+  | 'HandwritingSVGVertical'
+  | 'RawTextVertical';
 
 export interface RenderOptions {
   compositionId: CompositionId;
@@ -30,17 +27,13 @@ export interface RenderOptions {
     to: string;
     content: string;
     backgroundVideo?: string;
+    /** Background image filename (relative to public/) for static templates */
+    backgroundImage?: string;
     /** Music filename (relative to public/) for templates using <Audio> */
     musicFile?: string;
     ctaLine1?: string;
     ctaLine2?: string;
     mood?: string;
-    /** TTS audio filename (relative to public/) for VoiceNarration */
-    audioFile?: string;
-    /** Word-level timing data for VoiceNarration sync */
-    wordTimings?: Array<{ word: string; startMs: number; endMs: number }>;
-    /** Audio duration in ms for VoiceNarration dynamic duration */
-    audioDurationMs?: number;
   };
   outputPath: string;
 }
@@ -51,13 +44,43 @@ export function isCinematic(compositionId: CompositionId): boolean {
 
 export function needsBackgroundVideo(compositionId: CompositionId): boolean {
   return compositionId.startsWith('Cinematic')
-    || compositionId.startsWith('POV')
-    || compositionId.startsWith('Modern');
+    || compositionId.startsWith('TextOnGradient')
+    || compositionId.startsWith('HandwritingSVG')
+    || compositionId.startsWith('SplitScreen');
 }
 
 export function needsMusicFile(compositionId: CompositionId): boolean {
   return !compositionId.startsWith('Cinematic')
-    && !compositionId.startsWith('VoiceNarration');
+    && !compositionId.startsWith('QuoteCard')
+    && !compositionId.startsWith('RawText');
+}
+
+export function needsBackgroundImage(compositionId: CompositionId): boolean {
+  return compositionId.startsWith('QuoteCard') || compositionId.startsWith('RawText');
+}
+
+/**
+ * Extract a single frame from a video as a JPEG image.
+ * Used for static templates that need a background image (not video).
+ */
+export async function extractFrameFromVideo(
+  videoPath: string,
+  outputPath: string,
+  timeSec = 2,
+): Promise<string> {
+  await execFileAsync('ffmpeg', [
+    '-y',
+    '-ss', String(timeSec),
+    '-i', videoPath,
+    '-vframes', '1',
+    '-q:v', '2',
+    outputPath,
+  ]);
+  return outputPath;
+}
+
+export function isStaticTemplate(compositionId: CompositionId): boolean {
+  return compositionId.startsWith('QuoteCard') || compositionId.startsWith('RawText');
 }
 
 /**
@@ -66,11 +89,15 @@ export function needsMusicFile(compositionId: CompositionId): boolean {
  * so frame 0 is completely black. We pick a frame where content is visible.
  */
 export function getCoverFrame(compositionId: CompositionId): number {
-  // VoiceNarration: words start at frame 30 (audioStartFrame), pick frame 45
-  // so a few words are visible as the hook
-  if (compositionId.startsWith('VoiceNarration')) return 45;
-  // All other templates: content appears at frame 15 (contentDelay),
-  // pick frame 20 to be safely past both loop fade and content delay
+  // Static templates: single frame
+  if (isStaticTemplate(compositionId)) return 0;
+  // Phone UI templates: show the UI chrome + early typing
+  if (compositionId.startsWith('DeletedText')) return 30;
+  // SplitScreen: both halves visible
+  if (compositionId.startsWith('SplitScreen')) return 70;
+  // HandwritingSVG: mid-writing
+  if (compositionId.startsWith('HandwritingSVG')) return 90;
+  // All other templates: frame 20
   return 20;
 }
 
@@ -141,6 +168,37 @@ export async function renderVideo(options: RenderOptions): Promise<string> {
 
   console.log(`Video saved to: ${outputPath}`);
   return outputPath;
+}
+
+/**
+ * Render a static image (PNG) for templates that don't produce video.
+ * Used by QuoteCard (Pinterest) and RawText (social preview) templates.
+ */
+export async function renderStaticImage(options: RenderOptions): Promise<string> {
+  const { compositionId, props, outputPath } = options;
+
+  const bundled = await ensureBundle();
+
+  console.log('Selecting composition...');
+  const composition = await selectComposition({
+    serveUrl: bundled,
+    id: compositionId,
+    inputProps: props,
+  });
+
+  const pngPath = outputPath.replace(/\.mp4$/, '.png');
+  console.log(`Rendering static image ${composition.width}x${composition.height}...`);
+  await renderStill({
+    composition,
+    serveUrl: bundled,
+    output: pngPath,
+    frame: 0,
+    inputProps: props,
+    imageFormat: 'png',
+  });
+
+  console.log(`Static image saved to: ${pngPath}`);
+  return pngPath;
 }
 
 /**

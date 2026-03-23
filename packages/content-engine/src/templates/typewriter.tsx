@@ -29,13 +29,13 @@ export const TypewriterMessage: React.FC<MessageProps> = ({
   const isVertical = height > 1200;
   const loopFade = useLoopFade();
 
-  // --- Animation timing ---
-  // Blinking cursor on empty screen (frames 0-30) — the hook
-  const cursorOnly = frame < 30;
+  // --- Animation timing (fast for social media) ---
+  // Blinking cursor on empty screen (frames 0-10) — the hook
+  const cursorOnly = frame < 10;
 
-  // Content reveal: char-by-char (frames 30 → 30 + content.length * 0.8)
-  const contentDelay = 30;
-  const totalRevealFrames = Math.max(content.length * 0.8, 50);
+  // Content reveal: char-by-char (frames 10 → 10 + content.length * 0.4)
+  const contentDelay = 10;
+  const totalRevealFrames = Math.max(content.length * 0.4, 30);
   const charsRevealed = interpolate(
     frame,
     [contentDelay, contentDelay + totalRevealFrames],

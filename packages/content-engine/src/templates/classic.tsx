@@ -1,6 +1,8 @@
 import React from 'react';
 import {
   AbsoluteFill,
+  Video,
+  staticFile,
   interpolate,
   useCurrentFrame,
   useVideoConfig,
@@ -8,89 +10,94 @@ import {
   Easing,
 } from 'remotion';
 import type { MessageProps } from '../compositions/Root';
-import { BackgroundMusic, useLoopFade } from './template-utils';
+import { BackgroundMusic, useLoopFade, useFadeIn } from './template-utils';
 
-export const ClassicMessage: React.FC<MessageProps> = ({ from, to, content, musicFile }) => {
+export interface ClassicProps extends MessageProps {
+  backgroundVideo?: string;
+}
+
+export const ClassicMessage: React.FC<ClassicProps> = ({ from, to, content, musicFile, backgroundVideo }) => {
   const frame = useCurrentFrame();
   const { fps, height, durationInFrames } = useVideoConfig();
   const isVertical = height > 1200;
-  const loopFade = useLoopFade();
+  const loopFade = useLoopFade(15, 8);
 
-  // --- Timing ---
-  const toDelay = 20;
-  const contentDelay = 55;
-  const totalRevealFrames = Math.max(content.length * 0.9, 45);
-  const fromDelay = contentDelay + totalRevealFrames + 20;
+  // --- Fast timing for social media ---
+  const toDelay = 5;
+
+  // Content: full message reveal (not word-by-word — dark text on parchment needs full contrast)
+  const contentAnim = useFadeIn(12, 18);
+
+  // "From" after content is visible
+  const fromDelay = 50;
 
   // --- Background: deep warm gradient that slowly shifts ---
   const gradAngle = interpolate(frame, [0, durationInFrames], [150, 175], { extrapolateRight: 'clamp' });
 
   // --- Large decorative quote mark that fades in behind text ---
-  const quoteOpacity = interpolate(frame, [10, 50], [0, 0.06], {
+  const quoteOpacity = interpolate(frame, [5, 30], [0, 0.06], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
-  const quoteScale = interpolate(frame, [10, 60], [0.8, 1], {
+  const quoteScale = interpolate(frame, [5, 35], [0.8, 1], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
     easing: Easing.out(Easing.cubic),
   });
 
   // --- Warm light bloom behind text area ---
-  const bloomOpacity = interpolate(frame, [30, 70, durationInFrames - 40, durationInFrames], [0, 0.25, 0.25, 0], {
+  const bloomOpacity = interpolate(frame, [15, 40, durationInFrames - 30, durationInFrames], [0, 0.25, 0.25, 0], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
   const bloomY = interpolate(frame, [0, durationInFrames], [45, 40], { extrapolateRight: 'clamp' });
 
   // --- Decorative side lines ---
-  const lineLength = spring({ frame: frame - 15, fps, config: { damping: 12, stiffness: 25 } });
+  const lineLength = spring({ frame: frame - 5, fps, config: { damping: 12, stiffness: 25 } });
 
   // --- "To" label ---
-  const toOpacity = interpolate(frame, [toDelay, toDelay + 20], [0, 1], {
+  const toOpacity = interpolate(frame, [toDelay, toDelay + 12], [0, 1], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
-  const toSlide = interpolate(frame, [toDelay, toDelay + 25], [25, 0], {
+  const toSlide = interpolate(frame, [toDelay, toDelay + 15], [20, 0], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
     easing: Easing.out(Easing.cubic),
   });
 
-  // --- Content: character reveal ---
-  const charsRevealed = interpolate(
-    frame,
-    [contentDelay, contentDelay + totalRevealFrames],
-    [0, content.length],
-    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
-  );
-  const visibleContent = content.slice(0, Math.floor(charsRevealed));
-  const typing = frame >= contentDelay && frame < contentDelay + totalRevealFrames + 12;
-  const showCursor = typing && Math.floor(frame / 7) % 2 === 0;
-
   // --- "From" ---
-  const fromOpacity = interpolate(frame, [fromDelay, fromDelay + 25], [0, 1], {
+  const fromOpacity = interpolate(frame, [fromDelay, fromDelay + 15], [0, 1], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
-  const fromSlide = interpolate(frame, [fromDelay, fromDelay + 28], [18, 0], {
+  const fromSlide = interpolate(frame, [fromDelay, fromDelay + 18], [15, 0], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
     easing: Easing.out(Easing.cubic),
   });
 
   // --- Branding ---
-  const brandOpacity = interpolate(frame, [90, 110, durationInFrames - 30, durationInFrames], [0, 0.45, 0.45, 0], {
+  const brandStart = fromDelay;
+  const brandOpacity = interpolate(frame, [brandStart, brandStart + 15], [0, 0.7], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
 
-  const contentFontSize = isVertical ? 62 : 48;
+  const contentFontSize = isVertical ? 68 : 52;
+
+  // Text colors — always dark since overlay creates a warm light background
+  const hasVideo = !!backgroundVideo;
+  const textColor = '#2a1f18';
+  const accentColor = '#6b5545';
+  const lineColor = '#7a6050';
+  const quoteColor = '#8a7060';
+  const textShadow = 'none';
 
   return (
     <AbsoluteFill
       style={{
-        background: `linear-gradient(${gradAngle}deg,
+        background: hasVideo ? '#d4c4b0' : `linear-gradient(${gradAngle}deg,
           #d4c4b0 0%,
           #c9b59e 35%,
           #bda78e 65%,
@@ -99,6 +106,31 @@ export const ClassicMessage: React.FC<MessageProps> = ({ from, to, content, musi
       }}
     >
       <BackgroundMusic musicFile={musicFile} />
+
+      {/* Optional background video */}
+      {backgroundVideo && (
+        <>
+          <AbsoluteFill>
+            <Video
+              src={staticFile(backgroundVideo)}
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
+          </AbsoluteFill>
+          {/* Warm parchment overlay — lets video texture through with dark text */}
+          <AbsoluteFill
+            style={{
+              background: `linear-gradient(
+                175deg,
+                rgba(212, 196, 176, 0.72) 0%,
+                rgba(201, 181, 158, 0.76) 35%,
+                rgba(189, 167, 142, 0.78) 65%,
+                rgba(168, 144, 122, 0.8) 100%
+              )`,
+            }}
+          />
+        </>
+      )}
+
       {/* Warm light bloom behind text */}
       <div
         style={{
@@ -124,7 +156,7 @@ export const ClassicMessage: React.FC<MessageProps> = ({ from, to, content, musi
           transform: `translate(-50%, -50%) scale(${quoteScale})`,
           fontFamily: 'Georgia, serif',
           fontSize: isVertical ? 600 : 400,
-          color: '#8a7060',
+          color: quoteColor,
           opacity: quoteOpacity * 0.7,
           lineHeight: 1,
           userSelect: 'none',
@@ -142,7 +174,7 @@ export const ClassicMessage: React.FC<MessageProps> = ({ from, to, content, musi
         }}
       />
 
-      {/* Subtle vignette for depth */}
+      {/* Vignette */}
       <AbsoluteFill
         style={{
           background: 'radial-gradient(ellipse at center, transparent 50%, rgba(80,50,30,0.15) 100%)',
@@ -176,7 +208,7 @@ export const ClassicMessage: React.FC<MessageProps> = ({ from, to, content, musi
             style={{
               width: lineLength * 60,
               height: 1,
-              backgroundColor: '#7a6050',
+              backgroundColor: lineColor,
               opacity: 0.5,
             }}
           />
@@ -186,10 +218,11 @@ export const ClassicMessage: React.FC<MessageProps> = ({ from, to, content, musi
               fontFamily: 'Poppins, sans-serif',
               fontSize: isVertical ? 28 : 22,
               fontWeight: 500,
-              color: '#6b5545',
+              color: accentColor,
               letterSpacing: '6px',
               textTransform: 'uppercase',
               whiteSpace: 'nowrap',
+              textShadow,
             }}
           >
             To {to}
@@ -198,29 +231,29 @@ export const ClassicMessage: React.FC<MessageProps> = ({ from, to, content, musi
             style={{
               width: lineLength * 60,
               height: 1,
-              backgroundColor: '#7a6050',
+              backgroundColor: lineColor,
               opacity: 0.5,
             }}
           />
         </div>
 
-        {/* Message content — large, dominant */}
+        {/* Message content — full reveal */}
         <div
           style={{
+            opacity: contentAnim.opacity,
+            transform: `translateY(${contentAnim.slideY}px)`,
             fontFamily: 'Georgia, "Times New Roman", serif',
             fontSize: contentFontSize,
             lineHeight: 1.55,
-            color: '#2a1f18',
+            color: textColor,
             textAlign: 'center',
             maxWidth: isVertical ? 860 : 820,
-            fontWeight: 400,
+            fontWeight: 500,
             padding: '0 10px',
+            textShadow,
           }}
         >
-          {visibleContent}
-          {showCursor && (
-            <span style={{ color: '#8a6e5a', opacity: 0.8 }}>|</span>
-          )}
+          {content}
         </div>
 
         {/* "From" signature with line */}
@@ -238,7 +271,7 @@ export const ClassicMessage: React.FC<MessageProps> = ({ from, to, content, musi
             style={{
               width: 30,
               height: 1,
-              backgroundColor: '#7a6050',
+              backgroundColor: lineColor,
               opacity: 0.6,
             }}
           />
@@ -247,9 +280,10 @@ export const ClassicMessage: React.FC<MessageProps> = ({ from, to, content, musi
               fontFamily: 'Poppins, sans-serif',
               fontSize: isVertical ? 28 : 22,
               fontWeight: 400,
-              color: '#5e4a3a',
+              color: accentColor,
               letterSpacing: '4px',
               textTransform: 'uppercase',
+              textShadow,
             }}
           >
             {from}
@@ -266,11 +300,12 @@ export const ClassicMessage: React.FC<MessageProps> = ({ from, to, content, musi
           right: 0,
           textAlign: 'center',
           fontFamily: 'Poppins, sans-serif',
-          fontSize: isVertical ? 15 : 13,
-          color: '#6b5545',
+          fontSize: isVertical ? 20 : 15,
+          color: accentColor,
           opacity: brandOpacity,
           letterSpacing: '5px',
           textTransform: 'uppercase',
+          textShadow,
         }}
       >
         words left unsent

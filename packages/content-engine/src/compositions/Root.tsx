@@ -1,16 +1,18 @@
 import React from 'react';
 import { Composition, registerRoot } from 'remotion';
-import { ClassicMessage } from '../templates/classic';
-import { ModernMessage } from '../templates/modern';
 import { CinematicMessage } from '../templates/cinematic';
 import type { CinematicProps } from '../templates/cinematic';
-import { POVMessage } from '../templates/pov';
-import type { POVProps } from '../templates/pov';
 import { TextOnGradientMessage } from '../templates/textongradient';
-import { TypewriterMessage } from '../templates/typewriter';
-import { HandwrittenMessage } from '../templates/handwritten';
-import { VoiceNarrationMessage } from '../templates/voicenarration';
-import type { VoiceNarrationProps } from '../templates/voicenarration';
+import type { TextOnGradientProps } from '../templates/textongradient';
+import { DeletedTextMessage } from '../templates/deleted-text';
+import { QuoteCardMessage } from '../templates/quote-card';
+import type { QuoteCardProps } from '../templates/quote-card';
+import { SplitScreenMessage } from '../templates/split-screen';
+import type { SplitScreenProps } from '../templates/split-screen';
+import { HandwritingSVGMessage } from '../templates/handwriting-svg';
+import type { HandwritingSVGProps } from '../templates/handwriting-svg';
+import { RawTextMessage } from '../templates/raw-text';
+import type { RawTextProps } from '../templates/raw-text';
 import { calculateDurationFrames } from '../templates/template-utils';
 
 export type MessageProps = {
@@ -32,14 +34,9 @@ export const RemotionRoot: React.FC = () => {
     backgroundVideo: 'bg-placeholder.mp4',
   };
 
-  const povProps: POVProps = {
+  const textOnGradientProps: TextOnGradientProps = {
     ...commonProps,
-    backgroundVideo: undefined,
-    musicFile: undefined,
-  };
-
-  const modernProps: MessageProps & { backgroundVideo?: string } = {
-    ...commonProps,
+    mood: 'tender',
     backgroundVideo: undefined,
   };
 
@@ -47,29 +44,35 @@ export const RemotionRoot: React.FC = () => {
     durationInFrames: calculateDurationFrames((props as MessageProps).content),
   });
 
+  // SplitScreen: word reveal + attribution + CTA with 3.5s visibility
+  const calcSplitScreenDuration = async ({ props }: { props: Record<string, unknown> }) => {
+    const content = (props as MessageProps).content;
+    const words = content.split(/\s+/).filter(Boolean);
+    const wordRevealStart = 60;
+    const revealEnd = wordRevealStart + words.length / 0.25;
+    const ctaStart = revealEnd + 15;
+    const ctaFullyVisible = ctaStart + 20;
+    const durationInFrames = ctaFullyVisible + 105; // 3.5s of CTA visibility
+    return { durationInFrames };
+  };
+
+  // DeletedText needs extra time: typing + scaled hold + delete + replace + send + 2.5s CTA
+  const calcDeletedTextDuration = async ({ props }: { props: Record<string, unknown> }) => {
+    const content = (props as MessageProps).content;
+    const typeEnd = Math.min(10 + Math.ceil(content.length / 1), 160);
+    const holdFrames = Math.min(Math.max(75, Math.ceil(content.length * 0.8)), 135);
+    const holdEnd = typeEnd + holdFrames;
+    const deleteEnd = Math.min(holdEnd + Math.ceil(content.length / 5), holdEnd + 30);
+    const replaceEnd = Math.min(deleteEnd + 10 + Math.ceil(19 / 1.5), deleteEnd + 10 + 35);
+    const ctaStart = replaceEnd + 8; // sendMoment (CTA starts earlier)
+    const ctaFullyVisible = ctaStart + 20; // fade-in duration
+    const durationInFrames = ctaFullyVisible + 105; // 3.5s of CTA visibility
+    return { durationInFrames };
+  };
+
   return (
     <>
       {/* Vertical (Reels / TikTok) */}
-      <Composition
-        id="ClassicVertical"
-        component={ClassicMessage}
-        durationInFrames={240}
-        fps={30}
-        width={1080}
-        height={1920}
-        defaultProps={commonProps}
-        calculateMetadata={calcDuration}
-      />
-      <Composition
-        id="ModernVertical"
-        component={ModernMessage}
-        durationInFrames={240}
-        fps={30}
-        width={1080}
-        height={1920}
-        defaultProps={modernProps}
-        calculateMetadata={calcDuration}
-      />
       <Composition
         id="CinematicVertical"
         component={CinematicMessage}
@@ -81,91 +84,79 @@ export const RemotionRoot: React.FC = () => {
         calculateMetadata={calcDuration}
       />
       <Composition
-        id="POVVertical"
-        component={POVMessage}
-        durationInFrames={240}
-        fps={30}
-        width={1080}
-        height={1920}
-        defaultProps={povProps}
-        calculateMetadata={calcDuration}
-      />
-      <Composition
         id="TextOnGradientVertical"
         component={TextOnGradientMessage}
         durationInFrames={240}
         fps={30}
         width={1080}
         height={1920}
-        defaultProps={{ ...commonProps, mood: 'tender' }}
-        calculateMetadata={calcDuration}
-      />
-      <Composition
-        id="TypewriterVertical"
-        component={TypewriterMessage}
-        durationInFrames={240}
-        fps={30}
-        width={1080}
-        height={1920}
-        defaultProps={commonProps}
-        calculateMetadata={calcDuration}
-      />
-      <Composition
-        id="HandwrittenVertical"
-        component={HandwrittenMessage}
-        durationInFrames={240}
-        fps={30}
-        width={1080}
-        height={1920}
-        defaultProps={commonProps}
+        defaultProps={textOnGradientProps}
         calculateMetadata={calcDuration}
       />
 
-      {/* VoiceNarration — dynamic duration, passed via inputProps at render time */}
+      {/* Platform-optimized templates */}
       <Composition
-        id="VoiceNarrationVertical"
-        component={VoiceNarrationMessage}
-        durationInFrames={300}
+        id="DeletedTextVertical"
+        component={DeletedTextMessage}
+        durationInFrames={240}
+        fps={30}
+        width={1080}
+        height={1920}
+        defaultProps={commonProps}
+        calculateMetadata={calcDeletedTextDuration}
+      />
+      <Composition
+        id="QuoteCardVertical"
+        component={QuoteCardMessage}
+        durationInFrames={1}
+        fps={30}
+        width={1080}
+        height={1350}
+        defaultProps={{
+          ...commonProps,
+          backgroundImage: undefined,
+        } as QuoteCardProps}
+      />
+      <Composition
+        id="SplitScreenVertical"
+        component={SplitScreenMessage}
+        durationInFrames={240}
         fps={30}
         width={1080}
         height={1920}
         defaultProps={{
           ...commonProps,
-          audioFile: undefined,
-          wordTimings: undefined,
-          audioDurationMs: 5000,
-        } as unknown as VoiceNarrationProps}
-        calculateMetadata={async ({ props }) => {
-          // Dynamic duration: use audioDurationMs + 4s padding (2s intro + 2s outro)
-          const audioDurationMs = (props as unknown as VoiceNarrationProps).audioDurationMs ?? 5000;
-          const totalSec = audioDurationMs / 1000 + 4;
-          return {
-            durationInFrames: Math.ceil(totalSec * 30),
-          };
-        }}
+          backgroundVideo: undefined,
+        } as SplitScreenProps}
+        calculateMetadata={calcSplitScreenDuration}
+      />
+      <Composition
+        id="HandwritingSVGVertical"
+        component={HandwritingSVGMessage}
+        durationInFrames={240}
+        fps={30}
+        width={1080}
+        height={1920}
+        defaultProps={{
+          ...commonProps,
+          backgroundVideo: undefined,
+        } as HandwritingSVGProps}
+        calculateMetadata={calcDuration}
+      />
+      <Composition
+        id="RawTextVertical"
+        component={RawTextMessage}
+        durationInFrames={1}
+        fps={30}
+        width={1080}
+        height={1080}
+        defaultProps={{
+          ...commonProps,
+          backgroundImage: undefined,
+        } as RawTextProps}
       />
 
       {/* Square (Feed posts) */}
-      <Composition
-        id="ClassicSquare"
-        component={ClassicMessage}
-        durationInFrames={240}
-        fps={30}
-        width={1080}
-        height={1080}
-        defaultProps={commonProps}
-        calculateMetadata={calcDuration}
-      />
-      <Composition
-        id="ModernSquare"
-        component={ModernMessage}
-        durationInFrames={240}
-        fps={30}
-        width={1080}
-        height={1080}
-        defaultProps={modernProps}
-        calculateMetadata={calcDuration}
-      />
       <Composition
         id="CinematicSquare"
         component={CinematicMessage}

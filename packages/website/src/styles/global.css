@@ -243,7 +243,8 @@ body::before {
     filter: none;
     transition: none;
   }
-  .skeleton {
+  .skeleton,
+  .scroll-spinner {
     animation: none;
   }
 }

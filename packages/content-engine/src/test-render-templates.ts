@@ -25,14 +25,13 @@ const TEMPLATES: Array<{
   /** Skip templates that need external assets (bg video, TTS audio) */
   skip?: string;
 }> = [
-  { id: 'TextOnGradientVertical', extraProps: { mood: 'tender' } },
-  { id: 'TypewriterVertical' },
-  { id: 'HandwrittenVertical' },
-  { id: 'POVVertical' },
   { id: 'CinematicVertical', skip: 'requires background video file' },
-  { id: 'ClassicVertical' },
-  { id: 'ModernVertical' },
-  { id: 'VoiceNarrationVertical' },
+  { id: 'TextOnGradientVertical', extraProps: { mood: 'tender' }, skip: 'requires background video file' },
+  { id: 'DeletedTextVertical' },
+  { id: 'QuoteCardVertical' },
+  { id: 'SplitScreenVertical', skip: 'requires background video file' },
+  { id: 'HandwritingSVGVertical', skip: 'requires background video file' },
+  { id: 'RawTextVertical' },
 ];
 
 async function main() {

@@ -1,6 +1,8 @@
 import React from 'react';
 import {
   AbsoluteFill,
+  Video,
+  staticFile,
   interpolate,
   useCurrentFrame,
   useVideoConfig,
@@ -11,22 +13,23 @@ import { FilmGrain, Vignette, CTASection, MOOD_COLORS, BackgroundMusic, useLoopF
 
 export interface TextOnGradientProps extends MessageProps {
   mood?: string;
+  backgroundVideo?: string;
 }
 
 /**
  * TextOnGradient — clean, viral template.
  *
- * Design: solid mood-mapped color background, bold Poppins text, dark text (#1a1a1a).
- * No word-by-word animation — the full message is the hook. Static simplicity.
+ * Design: solid mood-mapped color background (or background video with mood overlay),
+ * bold Poppins text, quick full-message reveal.
  * Meant for quick-hit scroll-stopping content.
- *
- * 240 frames / 30fps = 8 seconds total.
  */
 export const TextOnGradientMessage: React.FC<TextOnGradientProps> = ({
   from,
+  to,
   content,
   mood = 'tender',
   musicFile,
+  backgroundVideo,
 }) => {
   const frame = useCurrentFrame();
   const { height, durationInFrames } = useVideoConfig();
@@ -34,43 +37,71 @@ export const TextOnGradientMessage: React.FC<TextOnGradientProps> = ({
   const loopFade = useLoopFade();
 
   const bgColor = MOOD_COLORS[mood] ?? MOOD_COLORS.tender;
+  const hasVideo = !!backgroundVideo;
+
+  // Parse hex to RGB for overlay rgba values
+  const hexToRgb = (hex: string) => {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `${r}, ${g}, ${b}`;
+  };
+  const bgRgb = hexToRgb(bgColor);
 
   // --- Animation timing ---
-  // Content fades in quickly (frames 5-25)
-  const contentOpacity = interpolate(frame, [5, 25], [0, 1], {
+  // "To" label (frames 3-15)
+  const toOpacity = interpolate(frame, [3, 15], [0, 1], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
-  const contentSlide = interpolate(frame, [5, 28], [20, 0], {
+  const toSlide = interpolate(frame, [3, 15], [12, 0], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
     easing: Easing.out(Easing.cubic),
   });
 
-  // "From" attribution (frames 60-85)
-  const fromOpacity = interpolate(frame, [60, 85], [0, 1], {
+  // Content fades in quickly (frames 5-20)
+  const contentOpacity = interpolate(frame, [5, 20], [0, 1], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
-  const fromSlide = interpolate(frame, [60, 85], [12, 0], {
+  const contentSlide = interpolate(frame, [5, 22], [20, 0], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+    easing: Easing.out(Easing.cubic),
+  });
+
+  // "From" attribution (frames 40-60)
+  const fromOpacity = interpolate(frame, [40, 60], [0, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  });
+  const fromSlide = interpolate(frame, [40, 60], [12, 0], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
     easing: Easing.out(Easing.cubic),
   });
 
   // CTA — relative to end
-  const ctaStart = Math.max(100, durationInFrames - 100);
-  const ctaOpacity = interpolate(frame, [ctaStart, ctaStart + 25], [0, 1], {
+  const ctaStart = Math.max(80, durationInFrames - 80);
+  const ctaOpacity = interpolate(frame, [ctaStart, ctaStart + 20], [0, 1], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
-  const ctaSlide = interpolate(frame, [ctaStart, ctaStart + 23], [15, 0], {
+  const ctaSlide = interpolate(frame, [ctaStart, ctaStart + 18], [15, 0], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
     easing: Easing.out(Easing.cubic),
   });
 
   const contentFontSize = isVertical ? 72 : 54;
+
+  // Adapt colors based on background type
+  const textColor = hasVideo ? '#f0e8e0' : '#1a1a1a';
+  const toColor = hasVideo ? 'rgba(220, 190, 150, 0.8)' : 'rgba(26, 26, 26, 0.5)';
+  const fromColor = hasVideo ? 'rgba(220, 190, 150, 0.85)' : 'rgba(26, 26, 26, 0.6)';
+  const ctaColor = hasVideo ? 'rgba(220, 190, 150, 1)' : 'rgba(26, 26, 26, 0.5)';
+  const textShadow = hasVideo ? '0 2px 12px rgba(0, 0, 0, 0.8), 0 4px 30px rgba(0, 0, 0, 0.5)' : 'none';
 
   return (
     <AbsoluteFill
@@ -80,11 +111,36 @@ export const TextOnGradientMessage: React.FC<TextOnGradientProps> = ({
       }}
     >
       <BackgroundMusic musicFile={musicFile} />
+
+      {/* Optional background video with mood-colored overlay */}
+      {backgroundVideo && (
+        <>
+          <AbsoluteFill>
+            <Video
+              src={staticFile(backgroundVideo)}
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
+          </AbsoluteFill>
+          {/* Mood-colored gradient overlay */}
+          <AbsoluteFill
+            style={{
+              background: `linear-gradient(
+                180deg,
+                rgba(${bgRgb}, 0.55) 0%,
+                rgba(${bgRgb}, 0.65) 40%,
+                rgba(${bgRgb}, 0.72) 70%,
+                rgba(${bgRgb}, 0.80) 100%
+              )`,
+            }}
+          />
+        </>
+      )}
+
       {/* Subtle grain for texture */}
-      <FilmGrain opacity={0.04} blendMode="multiply" />
+      <FilmGrain opacity={hasVideo ? 0.04 : 0.04} blendMode={hasVideo ? 'overlay' : 'multiply'} />
 
       {/* Soft vignette */}
-      <Vignette innerRadius="50%" outerOpacity={0.15} />
+      <Vignette innerRadius={hasVideo ? '35%' : '50%'} outerOpacity={hasVideo ? 0.5 : 0.15} />
 
       {/* Main content — centered, dominant */}
       <div
@@ -95,11 +151,29 @@ export const TextOnGradientMessage: React.FC<TextOnGradientProps> = ({
           alignItems: 'center',
           height: '100%',
           padding: isVertical
-            ? '200px 90px 400px 90px'
+            ? '200px 90px 540px 90px'
             : '100px 60px 180px 60px',
         }}
       >
-        {/* Message — full text, bold, dark */}
+        {/* "To" label */}
+        <div
+          style={{
+            opacity: toOpacity,
+            transform: `translateY(${toSlide}px)`,
+            fontFamily: 'Poppins, sans-serif',
+            fontSize: isVertical ? 26 : 20,
+            fontWeight: 400,
+            color: toColor,
+            letterSpacing: '5px',
+            textTransform: 'uppercase',
+            marginBottom: isVertical ? 30 : 20,
+            textShadow,
+          }}
+        >
+          To {to}
+        </div>
+
+        {/* Message — full text, bold */}
         <div
           style={{
             opacity: contentOpacity,
@@ -108,9 +182,10 @@ export const TextOnGradientMessage: React.FC<TextOnGradientProps> = ({
             fontSize: contentFontSize,
             fontWeight: 600,
             lineHeight: 1.4,
-            color: '#1a1a1a',
+            color: textColor,
             textAlign: 'center',
             maxWidth: isVertical ? 880 : 820,
+            textShadow,
           }}
         >
           {content}
@@ -124,22 +199,23 @@ export const TextOnGradientMessage: React.FC<TextOnGradientProps> = ({
             fontFamily: 'Poppins, sans-serif',
             fontSize: isVertical ? 30 : 22,
             fontWeight: 400,
-            color: 'rgba(26, 26, 26, 0.6)',
+            color: fromColor,
             marginTop: isVertical ? 50 : 35,
             letterSpacing: '4px',
             textTransform: 'uppercase',
+            textShadow,
           }}
         >
           &mdash; {from}
         </div>
       </div>
 
-      {/* CTA — dark text version */}
+      {/* CTA */}
       <CTASection
         opacity={ctaOpacity}
         slideY={ctaSlide}
         isVertical={isVertical}
-        color="rgba(26, 26, 26, 0.5)"
+        color={ctaColor}
       />
     </AbsoluteFill>
   );

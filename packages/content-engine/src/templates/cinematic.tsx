@@ -32,9 +32,9 @@ export const CinematicMessage: React.FC<CinematicProps> = ({
   const isVertical = height > 1200;
   const loopFade = useLoopFade();
 
-  // --- Animation timing (compressed for faster hook) ---
+  // --- Animation timing (fast reveal for social media) ---
   const toDelay = 5;
-  const contentDelay = 15;
+  const contentDelay = 10;
   const words = content.split(' ');
 
   // Hook text: first ~5 words + "..." (visible on frame 0 for thumbnail)
@@ -45,7 +45,7 @@ export const CinematicMessage: React.FC<CinematicProps> = ({
       : words.slice(0, hookWordCount).join(' ') + '...';
 
   // Fixed overhead frames
-  const FROM_GAP = 10;
+  const FROM_GAP = 5;
   const FROM_FADE_IN = 15;
   const FADE_OUT = 18;
   const CTA_RESERVE = 30;
@@ -53,7 +53,7 @@ export const CinematicMessage: React.FC<CinematicProps> = ({
 
   // Budget for word reveal + from-visible pause
   const budget = durationInFrames - contentDelay - fixedOverhead;
-  const idealWordReveal = Math.max(words.length * 5, 50);
+  const idealWordReveal = Math.max(words.length * 3, 30);
   const idealFromVisible = 50;
   const idealTotal = idealWordReveal + idealFromVisible;
 
@@ -236,7 +236,7 @@ export const CinematicMessage: React.FC<CinematicProps> = ({
           alignItems: 'center',
           height: '100%',
           padding: isVertical
-            ? '250px 120px 400px 70px'
+            ? '250px 120px 540px 70px'
             : '100px 60px 180px 60px',
           opacity: contentFadeOut,
         }}
@@ -354,7 +354,7 @@ export const CinematicMessage: React.FC<CinematicProps> = ({
           position: 'absolute',
           left: 0,
           right: 0,
-          bottom: isVertical ? 280 : 100,
+          bottom: isVertical ? 480 : 100,
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',

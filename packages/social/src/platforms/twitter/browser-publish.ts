@@ -58,7 +58,7 @@ export async function browserPublishTwitter(options: {
 
   try {
     console.log('[twitter-publish] Composing tweet...');
-    await composeTweet(page, tweetText);
+    await composeTweet(page, tweetText, options.coverImagePath);
 
     console.log('[twitter-publish] Tweet posted successfully!');
 
@@ -89,7 +89,7 @@ export async function browserPublishTwitter(options: {
 /**
  * Compose and post a tweet via X's web UI.
  */
-async function composeTweet(page: Page, text: string): Promise<void> {
+async function composeTweet(page: Page, text: string, imagePath?: string): Promise<void> {
   // Make sure we're on the home page
   if (!page.url().includes('/home')) {
     await page.goto('https://x.com/home', {
@@ -106,6 +106,16 @@ async function composeTweet(page: Page, text: string): Promise<void> {
     .first();
   await composeArea.click({ timeout: 10000 });
   await page.waitForTimeout(500);
+
+  // Attach image if provided
+  if (imagePath) {
+    console.log(`[twitter-publish] Attaching image: ${imagePath}`);
+    const fileInput = page.locator('input[data-testid="fileInput"]').first();
+    await fileInput.setInputFiles(imagePath);
+    // Wait for image upload to complete (thumbnail appears)
+    await page.waitForTimeout(3000);
+    console.log('[twitter-publish] Image attached');
+  }
 
   // Type the tweet
   await page.keyboard.type(text, { delay: 15 });

@@ -29,14 +29,14 @@ describe('getTemplateWeights', () => {
     }
   });
 
-  it('includes all templates from getAllTemplates in every platform', () => {
+  it('only uses templates from getAllTemplates', () => {
     const allTemplates = getAllTemplates();
     const platforms = ['instagram', 'tiktok', 'youtube', 'reddit', 'pinterest', 'twitter', 'threads'];
     for (const platform of platforms) {
       const weights = getTemplateWeights(platform);
       const templateIds = weights.map(([id]) => id);
-      for (const tmpl of allTemplates) {
-        expect(templateIds).toContain(tmpl);
+      for (const tmpl of templateIds) {
+        expect(allTemplates).toContain(tmpl);
       }
     }
   });
@@ -97,20 +97,19 @@ describe('pickWeightedTemplate', () => {
 });
 
 describe('getAllTemplates', () => {
-  it('returns all 8 template IDs', () => {
+  it('returns all 7 active template IDs', () => {
     const templates = getAllTemplates();
-    expect(templates.length).toBe(8);
+    expect(templates.length).toBe(7);
   });
 
-  it('includes core templates', () => {
+  it('includes active templates', () => {
     const templates = getAllTemplates();
     expect(templates).toContain('CinematicVertical');
-    expect(templates).toContain('POVVertical');
     expect(templates).toContain('TextOnGradientVertical');
-    expect(templates).toContain('TypewriterVertical');
-    expect(templates).toContain('HandwrittenVertical');
-    expect(templates).toContain('VoiceNarrationVertical');
-    expect(templates).toContain('ClassicVertical');
-    expect(templates).toContain('ModernVertical');
+    expect(templates).toContain('DeletedTextVertical');
+    expect(templates).toContain('QuoteCardVertical');
+    expect(templates).toContain('SplitScreenVertical');
+    expect(templates).toContain('HandwritingSVGVertical');
+    expect(templates).toContain('RawTextVertical');
   });
 });

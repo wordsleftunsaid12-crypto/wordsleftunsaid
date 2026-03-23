@@ -128,39 +128,50 @@ async function uploadVideo(
 
   // 6b. Set cover image if provided
   if (coverImagePath && existsSync(coverImagePath)) {
-    try {
-      console.log('[tiktok-publish] Setting cover image...');
-      const editCover = page.locator('div[data-e2e="edit_video_cover"]')
-        .or(page.getByText('Edit cover', { exact: false }))
-        .or(page.locator('[class*="cover"]').filter({ hasText: /cover/i }))
+    console.log('[tiktok-publish] Setting cover image...');
+    await page.screenshot({ path: '/tmp/tiktok-before-cover.png' }).catch(() => {});
+
+    const editCover = page.locator('div[data-e2e="edit_video_cover"]')
+      .or(page.getByText('Edit cover', { exact: false }))
+      .or(page.locator('[class*="cover"]').filter({ hasText: /cover/i }))
+      .first();
+    const editCoverVisible = await editCover.isVisible({ timeout: 5000 }).catch(() => false);
+    console.log(`[tiktok-publish] "Edit cover" visible: ${editCoverVisible}`);
+
+    if (editCoverVisible) {
+      await editCover.click();
+      await page.waitForTimeout(2000);
+      await page.screenshot({ path: '/tmp/tiktok-cover-editor.png' }).catch(() => {});
+
+      // Look for upload button in the cover editor
+      const uploadCover = page.getByText('Upload cover', { exact: false })
+        .or(page.locator('button').filter({ hasText: /upload/i }))
         .first();
-      if (await editCover.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await editCover.click();
-        await page.waitForTimeout(2000);
+      const uploadVisible = await uploadCover.isVisible({ timeout: 5000 }).catch(() => false);
+      console.log(`[tiktok-publish] "Upload cover" visible: ${uploadVisible}`);
 
-        // Look for upload button in the cover editor
-        const uploadCover = page.getByText('Upload cover', { exact: false })
-          .or(page.locator('button').filter({ hasText: /upload/i }))
-          .first();
-        if (await uploadCover.isVisible({ timeout: 3000 }).catch(() => false)) {
-          const [coverChooser] = await Promise.all([
-            page.waitForEvent('filechooser', { timeout: 10000 }),
-            uploadCover.click(),
-          ]);
-          await coverChooser.setFiles(coverImagePath);
-          console.log(`[tiktok-publish] Cover image set: ${basename(coverImagePath)}`);
-          await page.waitForTimeout(3000);
+      if (uploadVisible) {
+        const [coverChooser] = await Promise.all([
+          page.waitForEvent('filechooser', { timeout: 10000 }),
+          uploadCover.click(),
+        ]);
+        await coverChooser.setFiles(coverImagePath);
+        console.log(`[tiktok-publish] Cover image set: ${basename(coverImagePath)}`);
+        await page.waitForTimeout(3000);
 
-          // Confirm
-          const saveBtn = page.locator('button').filter({ hasText: /^(save|confirm|done)$/i }).first();
-          if (await saveBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-            await saveBtn.click();
-            await page.waitForTimeout(2000);
-          }
+        // Confirm
+        const saveBtn = page.locator('button').filter({ hasText: /^(save|confirm|done)$/i }).first();
+        if (await saveBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+          await saveBtn.click();
+          await page.waitForTimeout(2000);
         }
+      } else {
+        console.warn('[tiktok-publish] COVER UPLOAD FAILED: "Upload cover" not found. Screenshot: /tmp/tiktok-cover-editor.png');
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(1000);
       }
-    } catch (err) {
-      console.warn('[tiktok-publish] Cover image upload failed, continuing without it:', err instanceof Error ? err.message : err);
+    } else {
+      console.warn('[tiktok-publish] COVER UPLOAD SKIPPED: "Edit cover" button not found. Screenshot: /tmp/tiktok-before-cover.png');
     }
   }
 

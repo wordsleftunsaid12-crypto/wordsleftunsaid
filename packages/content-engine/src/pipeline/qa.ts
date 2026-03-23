@@ -40,6 +40,7 @@ export interface QAReport {
   metadata: VideoMetadata;
   checks: QACheck[];
   frameScreenshots: FrameCapture[];
+  contactSheetPath?: string;
   passed: boolean;
 }
 
@@ -201,18 +202,31 @@ async function extractKeyFrames(
 
 /** Per-template expected duration ranges (seconds). */
 function getDurationRange(template: string): { min: number; max: number } {
-  if (template.startsWith('VoiceNarration')) return { min: 3, max: 120 };
-  // All other templates use adaptive duration (calculateDurationFrames: 6-15s)
-  return { min: 5, max: 17 };
+  // Static image templates have no duration (handled separately in runStaticImageQA)
+  if (template.startsWith('QuoteCard') || template.startsWith('RawText')) return { min: 0, max: 1 };
+  // DeletedText has typing + hold + delete + replace + send + CTA animations
+  if (template.startsWith('DeletedText')) return { min: 6, max: 16 };
+  // SplitScreen has word reveal + attribution + CTA with extended visibility
+  if (template.startsWith('SplitScreen')) return { min: 4, max: 14 };
+  // All other templates use adaptive duration (calculateDurationFrames: 5-8s)
+  return { min: 4, max: 10 };
 }
 
 function runMetadataChecks(metadata: VideoMetadata, template: string): QACheck[] {
   const isVertical = template.includes('Vertical');
   const expectedWidth = 1080;
-  const expectedHeight = isVertical ? 1920 : 1080;
-  // Text-only templates (POV) are lighter than cinematic (no background video)
-  const minFileSize = template.startsWith('POV') ? 500_000 : 1_000_000;
-  const minLabel = template.startsWith('POV') ? '0.5MB' : '1MB';
+  // QuoteCard is 1350px tall, RawText is 1080x1080, others follow vertical/square
+  let expectedHeight: number;
+  if (template.startsWith('QuoteCard')) {
+    expectedHeight = 1350;
+  } else {
+    expectedHeight = isVertical ? 1920 : 1080;
+  }
+  // CSS-only templates (no background video) produce smaller files
+  const cssOnlyTemplates = ['DeletedText', 'SplitScreen'];
+  const isCssOnly = cssOnlyTemplates.some((t) => template.startsWith(t));
+  const minFileSize = isCssOnly ? 300_000 : 1_000_000;
+  const minLabel = isCssOnly ? '0.3MB' : '1MB';
   const durationRange = getDurationRange(template);
 
   return [
@@ -249,7 +263,155 @@ function runMetadataChecks(metadata: VideoMetadata, template: string): QACheck[]
   ];
 }
 
+// ─── Contact Sheet ──────────────────────────────────────────────────────────
+
+/**
+ * Generate a contact sheet (6-frame grid PNG) from a video.
+ * Extracts 6 evenly-spaced frames and tiles them into a 3x2 grid.
+ * Useful for visual review of rendered videos.
+ */
+export async function generateContactSheet(
+  videoPath: string,
+  outputPath: string,
+  columns = 3,
+  rows = 2,
+): Promise<string> {
+  const totalFrames = columns * rows;
+  const absoluteVideo = path.resolve(videoPath);
+  const absoluteOutput = path.resolve(outputPath);
+
+  // Ensure output directory exists
+  const outputDir = path.dirname(absoluteOutput);
+  if (!fs.existsSync(outputDir)) {
+    fs.mkdirSync(outputDir, { recursive: true });
+  }
+
+  // Get video duration to calculate evenly-spaced timestamps
+  const metadata = await getVideoMetadata(absoluteVideo);
+  const interval = metadata.durationSec / (totalFrames + 1);
+  // Build select expression: pick one frame at each interval timestamp
+  const selectParts: string[] = [];
+  for (let i = 1; i <= totalFrames; i++) {
+    const t = (interval * i).toFixed(3);
+    selectParts.push(`gte(t\\,${t})*lt(t\\,${(interval * i + 0.04).toFixed(3)})`);
+  }
+  const selectExpr = selectParts.join('+');
+
+  await execFileAsync('ffmpeg', [
+    '-y',
+    '-i', absoluteVideo,
+    '-vf', `select='${selectExpr}',scale=360:-1,tile=${columns}x${rows}`,
+    '-vsync', 'vfr',
+    '-frames:v', '1',
+    '-q:v', '3',
+    absoluteOutput,
+  ]);
+
+  return absoluteOutput;
+}
+
 // ─── Main QA Functions ───────────────────────────────────────────────────────
+
+/**
+ * Run QA checks on a static image (QuoteCard, RawText).
+ * Checks dimensions and file size — no video-specific checks.
+ */
+async function runStaticImageQA(
+  imagePath: string,
+  content: string,
+  template: string,
+): Promise<QAReport> {
+  const absolutePath = path.resolve(imagePath);
+  const basename = path.basename(absolutePath, '.png');
+  const outputDir = path.join(QA_OUTPUT_DIR, basename);
+
+  console.log(`[qa] Running static image QA on ${basename}...`);
+
+  const stats = fs.statSync(absolutePath);
+  const fileSizeBytes = stats.size;
+
+  // Get image dimensions via ffprobe (works for PNG)
+  const { stdout } = await execFileAsync('ffprobe', [
+    '-v', 'quiet',
+    '-print_format', 'json',
+    '-show_streams',
+    absolutePath,
+  ]);
+  const info = JSON.parse(stdout);
+  const stream = info.streams?.[0];
+  const width = stream?.width ?? 0;
+  const height = stream?.height ?? 0;
+
+  console.log(`[qa]   Resolution: ${width}x${height}`);
+  console.log(`[qa]   Size: ${(fileSizeBytes / 1_000_000).toFixed(2)}MB`);
+
+  // Expected dimensions by template
+  const expectedDims = template.startsWith('QuoteCard')
+    ? { w: 1080, h: 1350 }
+    : { w: 1080, h: 1080 }; // RawText
+
+  const checks: QACheck[] = [
+    {
+      name: 'resolution',
+      passed: width === expectedDims.w && height === expectedDims.h,
+      expected: `${expectedDims.w}x${expectedDims.h}`,
+      actual: `${width}x${height}`,
+    },
+    {
+      name: 'fileSize',
+      passed: fileSizeBytes >= 10_000 && fileSizeBytes <= 20_000_000,
+      expected: '10KB-20MB',
+      actual: `${(fileSizeBytes / 1_000_000).toFixed(2)}MB`,
+    },
+  ];
+
+  // Content length check
+  if (content) {
+    const { MAX_CONTENT_LENGTH } = await import('@wlu/shared');
+    const maxLen = MAX_CONTENT_LENGTH[template] ?? 160;
+    checks.push({
+      name: 'content-length',
+      passed: content.length <= maxLen,
+      expected: `<=${maxLen} chars`,
+      actual: `${content.length} chars`,
+    });
+  }
+
+  const passed = checks.every((c) => c.passed);
+
+  for (const check of checks) {
+    const icon = check.passed ? 'PASS' : 'FAIL';
+    console.log(`[qa]   [${icon}] ${check.name}: ${check.actual} (expected: ${check.expected})`);
+  }
+
+  const metadata: VideoMetadata = {
+    width,
+    height,
+    durationSec: 0,
+    codec: 'png',
+    fileSizeBytes,
+    fps: 0,
+  };
+
+  const report: QAReport = {
+    videoPath: absolutePath,
+    timestamp: new Date().toISOString(),
+    metadata,
+    checks,
+    frameScreenshots: [],
+    passed,
+  };
+
+  if (!fs.existsSync(outputDir)) {
+    fs.mkdirSync(outputDir, { recursive: true });
+  }
+  fs.writeFileSync(
+    path.join(outputDir, 'report.json'),
+    JSON.stringify(report, null, 2),
+  );
+
+  return report;
+}
 
 export async function runQA(
   videoPath: string,
@@ -259,7 +421,12 @@ export async function runQA(
   const absolutePath = path.resolve(videoPath);
 
   if (!fs.existsSync(absolutePath)) {
-    throw new Error(`Video file not found: ${absolutePath}`);
+    throw new Error(`File not found: ${absolutePath}`);
+  }
+
+  // Static image templates — use image QA instead of video QA
+  if (absolutePath.endsWith('.png') || template.startsWith('QuoteCard') || template.startsWith('RawText')) {
+    return runStaticImageQA(absolutePath, content, template);
   }
 
   // Determine output directory for this video's QA frames
@@ -364,8 +531,10 @@ export async function runQAForPendingItems(): Promise<{
 
       const report = await runQA(item.videoPath, content, item.template);
 
-      // Cross-video duplicate background check
-      if (report.passed && pendingItems.length > 1) {
+      // Cross-video duplicate background check (only for templates with video backgrounds)
+      const hasBgVideo = item.template?.startsWith('Cinematic') || item.template?.startsWith('TextOnGradient')
+        || item.template?.startsWith('HandwritingSVG');
+      if (report.passed && pendingItems.length > 1 && hasBgVideo) {
         const currentSize = report.metadata.fileSizeBytes;
         const duplicate = passedVideoSizes.find((prev) => {
           const ratio = currentSize / prev.size;

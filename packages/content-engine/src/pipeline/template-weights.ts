@@ -6,8 +6,14 @@ import type { CompositionId } from './render.js';
  * Weights should sum to 1.0 per platform. Higher weight = more frequently selected.
  * Adjust based on engagement data from the analytics daily summary.
  *
- * The "exploration" templates (new formats) start with lower weights
- * and can be increased as performance data comes in.
+ * Active templates (Mar 2026):
+ *   Cinematic — cinematic video with bg footage
+ *   TextOnGradient — mood-colored gradient with bg footage
+ *   DeletedText — phone UI simulation (no bg video)
+ *   SplitScreen — "What I said" vs "What I meant"
+ *   HandwritingSVG — SVG handwriting reveal on paper
+ *   QuoteCard — static Pinterest image (4:5 ratio)
+ *   RawText — text post cover image (1:1 square)
  */
 
 type TemplateWeight = [CompositionId, number];
@@ -23,88 +29,60 @@ interface PlatformWeights {
 }
 
 const PLATFORM_WEIGHTS: PlatformWeights = {
-  // Instagram: Reels-first, cinematic performs well, test new formats
+  // Instagram Reels: phone-native formats dominate
   instagram: [
-    ['CinematicVertical', 0.22],
-    ['POVVertical', 0.18],
+    ['CinematicVertical', 0.27],
+    ['DeletedTextVertical', 0.25],
+    ['SplitScreenVertical', 0.19],
+    ['HandwritingSVGVertical', 0.15],
     ['TextOnGradientVertical', 0.14],
-    ['TypewriterVertical', 0.14],
-    ['HandwrittenVertical', 0.09],
-    ['VoiceNarrationVertical', 0.08],
-    ['ClassicVertical', 0.08],
-    ['ModernVertical', 0.07],
   ],
 
-  // TikTok: Bold, fast-paced formats — VoiceNarration fits TikTok storytelling
+  // TikTok: fast-paced, relatable formats
   tiktok: [
-    ['POVVertical', 0.22],
-    ['TextOnGradientVertical', 0.18],
-    ['CinematicVertical', 0.18],
-    ['TypewriterVertical', 0.13],
-    ['VoiceNarrationVertical', 0.10],
-    ['HandwrittenVertical', 0.09],
-    ['ModernVertical', 0.05],
-    ['ClassicVertical', 0.05],
+    ['DeletedTextVertical', 0.33],
+    ['CinematicVertical', 0.22],
+    ['SplitScreenVertical', 0.19],
+    ['TextOnGradientVertical', 0.13],
+    ['HandwritingSVGVertical', 0.13],
   ],
 
-  // YouTube Shorts: Cinematic and slower-paced — VoiceNarration is a natural fit
+  // YouTube Shorts: slower-paced, cinematic
   youtube: [
-    ['CinematicVertical', 0.25],
-    ['POVVertical', 0.17],
-    ['VoiceNarrationVertical', 0.13],
-    ['HandwrittenVertical', 0.13],
-    ['TypewriterVertical', 0.13],
-    ['TextOnGradientVertical', 0.09],
-    ['ModernVertical', 0.05],
-    ['ClassicVertical', 0.05],
+    ['CinematicVertical', 0.34],
+    ['HandwritingSVGVertical', 0.27],
+    ['SplitScreenVertical', 0.23],
+    ['DeletedTextVertical', 0.16],
   ],
 
-  // Reddit: Text-forward formats, viral potential
+  // Reddit: text-first, cover image only
   reddit: [
-    ['TextOnGradientVertical', 0.23],
-    ['TypewriterVertical', 0.23],
-    ['POVVertical', 0.18],
-    ['CinematicVertical', 0.13],
-    ['HandwrittenVertical', 0.09],
-    ['VoiceNarrationVertical', 0.07],
-    ['ModernVertical', 0.04],
-    ['ClassicVertical', 0.03],
+    ['RawTextVertical', 0.58],
+    ['SplitScreenVertical', 0.24],
+    ['DeletedTextVertical', 0.18],
   ],
 
-  // Pinterest: Warm, aesthetic formats — voice less relevant for Pinterest
+  // Pinterest: static images + warm aesthetic
   pinterest: [
-    ['HandwrittenVertical', 0.24],
-    ['ClassicVertical', 0.19],
-    ['CinematicVertical', 0.19],
-    ['TextOnGradientVertical', 0.14],
-    ['ModernVertical', 0.09],
-    ['VoiceNarrationVertical', 0.05],
-    ['TypewriterVertical', 0.05],
-    ['POVVertical', 0.05],
+    ['QuoteCardVertical', 0.60],
+    ['HandwritingSVGVertical', 0.25],
+    ['CinematicVertical', 0.15],
   ],
 
-  // Twitter: Quick-hit, shareable formats
+  // Twitter: text-first, mixed with video
   twitter: [
-    ['TextOnGradientVertical', 0.27],
-    ['POVVertical', 0.22],
-    ['TypewriterVertical', 0.18],
-    ['CinematicVertical', 0.09],
-    ['HandwrittenVertical', 0.09],
-    ['VoiceNarrationVertical', 0.07],
-    ['ModernVertical', 0.04],
-    ['ClassicVertical', 0.04],
+    ['RawTextVertical', 0.40],
+    ['DeletedTextVertical', 0.27],
+    ['SplitScreenVertical', 0.23],
+    ['CinematicVertical', 0.10],
   ],
 
-  // Threads: Similar to Instagram but more text-forward
+  // Threads: text-forward + video
   threads: [
-    ['TextOnGradientVertical', 0.23],
-    ['POVVertical', 0.18],
-    ['CinematicVertical', 0.18],
-    ['TypewriterVertical', 0.13],
-    ['HandwrittenVertical', 0.09],
-    ['VoiceNarrationVertical', 0.08],
-    ['ClassicVertical', 0.06],
-    ['ModernVertical', 0.05],
+    ['RawTextVertical', 0.38],
+    ['DeletedTextVertical', 0.27],
+    ['SplitScreenVertical', 0.19],
+    ['CinematicVertical', 0.16],
   ],
 };
 
@@ -135,12 +113,11 @@ export function pickWeightedTemplate(weights: TemplateWeight[]): CompositionId {
 export function getAllTemplates(): CompositionId[] {
   return [
     'CinematicVertical',
-    'POVVertical',
     'TextOnGradientVertical',
-    'TypewriterVertical',
-    'HandwrittenVertical',
-    'VoiceNarrationVertical',
-    'ClassicVertical',
-    'ModernVertical',
+    'DeletedTextVertical',
+    'QuoteCardVertical',
+    'SplitScreenVertical',
+    'HandwritingSVGVertical',
+    'RawTextVertical',
   ];
 }

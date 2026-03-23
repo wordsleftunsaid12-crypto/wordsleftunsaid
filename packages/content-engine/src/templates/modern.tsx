@@ -17,12 +17,12 @@ export const ModernMessage: React.FC<MessageProps & { backgroundVideo?: string }
   const isVertical = height > 1200;
   const loopFade = useLoopFade();
 
-  // --- Animation timing ---
-  const toDelay = 15;
-  const contentDelay = 40;
+  // --- Animation timing (fast for social media) ---
+  const toDelay = 5;
+  const contentDelay = 10;
   const words = content.split(' ');
-  const wordRevealDuration = words.length * 5;
-  const fromDelay = contentDelay + wordRevealDuration + 10;
+  const wordRevealDuration = Math.max(words.length * 3, 30);
+  const fromDelay = contentDelay + wordRevealDuration + 5;
   // --- Background: slow breathing dark gradient ---
   const bgBrightness = interpolate(frame, [0, durationInFrames / 2, durationInFrames], [8, 11, 8], {
     extrapolateRight: 'clamp',

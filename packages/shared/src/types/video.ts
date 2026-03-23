@@ -1,14 +1,13 @@
 export type AspectRatio = '9:16' | '1:1' | '16:9';
 
 export type TemplateName =
-  | 'classic'
-  | 'modern'
   | 'cinematic'
-  | 'pov'
   | 'textongradient'
-  | 'typewriter'
-  | 'handwritten'
-  | 'voicenarration';
+  | 'deletedtext'
+  | 'quotecard'
+  | 'splitscreen'
+  | 'handwritingsvg'
+  | 'rawtext';
 
 export type MessageMood = 'tender' | 'regretful' | 'hopeful' | 'bittersweet' | 'raw';
 
@@ -37,18 +36,15 @@ export const VIDEO_PRESETS: Record<AspectRatio, Pick<VideoConfig, 'width' | 'hei
 /**
  * Max content length per template. Different templates have different font sizes,
  * padding, and layout constraints that affect how much text fits on screen.
- * VoiceNarration has no limit — duration adapts to content length.
  */
 export const MAX_CONTENT_LENGTH: Record<string, number> = {
   CinematicVertical: 160,
   CinematicSquare: 160,
-  POVVertical: 160,
-  ClassicVertical: 160,
-  ClassicSquare: 160,
-  ModernVertical: 160,
-  ModernSquare: 160,
   TextOnGradientVertical: 120,
-  TypewriterVertical: 180,
-  HandwrittenVertical: 140,
-  VoiceNarrationVertical: 500, // adaptive font sizing handles up to ~500 chars
+  // Platform-optimized templates
+  DeletedTextVertical: 150,    // needs room for backspace + replacement
+  QuoteCardVertical: 180,      // must be legible in static image
+  SplitScreenVertical: 160,    // bottom half only
+  HandwritingSVGVertical: 150, // handwriting takes space
+  RawTextVertical: 500,        // text post can be longer
 };

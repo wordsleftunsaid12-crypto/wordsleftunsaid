@@ -139,22 +139,26 @@ async function uploadShort(
 
   // 6b. Upload custom thumbnail if provided
   if (coverImagePath && existsSync(coverImagePath)) {
-    try {
-      console.log('[youtube-publish] Uploading custom thumbnail...');
-      const thumbBtn = page.getByText('Upload thumbnail', { exact: false })
-        .or(page.locator('#still-picker button').first())
-        .first();
-      if (await thumbBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-        const [thumbChooser] = await Promise.all([
-          page.waitForEvent('filechooser', { timeout: 10000 }),
-          thumbBtn.click(),
-        ]);
-        await thumbChooser.setFiles(coverImagePath);
-        console.log(`[youtube-publish] Thumbnail set: ${basename(coverImagePath)}`);
-        await page.waitForTimeout(3000);
-      }
-    } catch (err) {
-      console.warn('[youtube-publish] Thumbnail upload failed, continuing without it:', err instanceof Error ? err.message : err);
+    console.log('[youtube-publish] Uploading custom thumbnail...');
+    await page.screenshot({ path: '/tmp/yt-before-thumbnail.png' }).catch(() => {});
+
+    const thumbBtn = page.getByText('Upload thumbnail', { exact: false })
+      .or(page.locator('#still-picker button').first())
+      .first();
+    const thumbBtnVisible = await thumbBtn.isVisible({ timeout: 5000 }).catch(() => false);
+    console.log(`[youtube-publish] "Upload thumbnail" visible: ${thumbBtnVisible}`);
+
+    if (thumbBtnVisible) {
+      const [thumbChooser] = await Promise.all([
+        page.waitForEvent('filechooser', { timeout: 10000 }),
+        thumbBtn.click(),
+      ]);
+      await thumbChooser.setFiles(coverImagePath);
+      console.log(`[youtube-publish] Thumbnail set: ${basename(coverImagePath)}`);
+      await page.waitForTimeout(3000);
+      await page.screenshot({ path: '/tmp/yt-after-thumbnail.png' }).catch(() => {});
+    } else {
+      console.warn('[youtube-publish] THUMBNAIL UPLOAD SKIPPED: "Upload thumbnail" not found. Screenshot: /tmp/yt-before-thumbnail.png');
     }
   }
 

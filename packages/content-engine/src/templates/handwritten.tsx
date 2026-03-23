@@ -1,57 +1,68 @@
 import React from 'react';
 import {
   AbsoluteFill,
+  Video,
+  staticFile,
   interpolate,
   useCurrentFrame,
   useVideoConfig,
   Easing,
 } from 'remotion';
 import type { MessageProps } from '../compositions/Root';
-import { FilmGrain, Vignette, useFadeIn, useFadeOut, BackgroundMusic, useLoopFade } from './template-utils';
+import { FilmGrain, Vignette, useFadeIn, BackgroundMusic } from './template-utils';
+
+export interface HandwrittenProps extends MessageProps {
+  backgroundVideo?: string;
+}
 
 /**
  * Handwritten — personal, discovered-letter template.
  *
- * Design: Caveat handwriting font on parchment cream (#f5eede), ink brown (#3a2e24),
- * real letter format with "Dear [to]," opening and "Always, [from]" closing.
+ * Design: Caveat handwriting font on parchment cream (or background video with parchment overlay),
+ * ink brown text, real letter format with "Dear [to]," opening and "Always, [from]" closing.
  * Left-aligned for authenticity. Faded coffee ring and subtle paper grain.
- *
- * 240 frames / 30fps = 8 seconds total.
  */
-export const HandwrittenMessage: React.FC<MessageProps> = ({
+export const HandwrittenMessage: React.FC<HandwrittenProps> = ({
   from,
   to,
   content,
   musicFile,
+  backgroundVideo,
 }) => {
   const frame = useCurrentFrame();
   const { height, durationInFrames } = useVideoConfig();
   const isVertical = height > 1200;
-  const loopFade = useLoopFade();
+  const hasVideo = !!backgroundVideo;
 
-  // --- Animation timing ---
+  // Fade-in only — no fade-out so "Dear [to]," never disappears
+  const fadeIn = interpolate(frame, [0, 15], [0.85, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  });
+
+  // --- Animation timing (fast for social media) ---
   // "Dear [to]," visible on frame 0 — the hook
-  const salutationOpacity = interpolate(frame, [0, 15], [0.6, 1], {
+  const salutationOpacity = interpolate(frame, [0, 10], [0.6, 1], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
 
-  // Content fades in (frames 25-55)
-  const contentOpacity = interpolate(frame, [25, 55], [0, 1], {
+  // Content fades in quickly (frames 15-35)
+  const contentOpacity = interpolate(frame, [15, 35], [0, 1], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
-  const contentSlide = interpolate(frame, [25, 55], [15, 0], {
+  const contentSlide = interpolate(frame, [15, 35], [15, 0], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
     easing: Easing.out(Easing.cubic),
   });
 
-  // Closing "Always, [from]" (frames 100-130)
-  const closingAnim = useFadeIn(100, 25);
+  // Closing "Always, [from]" (frames 55-75)
+  const closingAnim = useFadeIn(55, 18);
 
   // Watermark branding — subtle, bottom
-  const brandOpacity = interpolate(frame, [130, 155, durationInFrames - 30, durationInFrames], [0, 0.3, 0.3, 0], {
+  const brandOpacity = interpolate(frame, [75, 95, durationInFrames - 25, durationInFrames], [0, 0.3, 0.3, 0], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
@@ -64,19 +75,52 @@ export const HandwrittenMessage: React.FC<MessageProps> = ({
 
   const contentFontSize = isVertical ? 64 : 48;
 
+  // Text colors — always dark brown since cream overlay creates a light background
+  const textColor = '#3a2e24';
+  const closingColor = 'rgba(58, 46, 36, 0.7)';
+  const brandColor = 'rgba(58, 46, 36, 0.4)';
+  const stainBorderColor = 'rgba(139, 107, 72, 0.15)';
+  const textShadow = 'none';
+
   return (
     <AbsoluteFill
       style={{
-        background: 'linear-gradient(175deg, #f5eede 0%, #efe5d4 50%, #e8dcc8 100%)',
-        opacity: loopFade,
+        background: hasVideo
+          ? '#0a0908'
+          : 'linear-gradient(175deg, #f5eede 0%, #efe5d4 50%, #e8dcc8 100%)',
+        opacity: fadeIn,
       }}
     >
       <BackgroundMusic musicFile={musicFile} />
+
+      {/* Optional background video with parchment overlay */}
+      {backgroundVideo && (
+        <>
+          <AbsoluteFill>
+            <Video
+              src={staticFile(backgroundVideo)}
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
+          </AbsoluteFill>
+          {/* Cream/parchment overlay */}
+          <AbsoluteFill
+            style={{
+              background: `linear-gradient(
+                175deg,
+                rgba(245, 238, 222, 0.65) 0%,
+                rgba(239, 229, 212, 0.7) 50%,
+                rgba(232, 220, 200, 0.75) 100%
+              )`,
+            }}
+          />
+        </>
+      )}
+
       {/* Paper grain texture */}
-      <FilmGrain opacity={0.06} blendMode="multiply" />
+      <FilmGrain opacity={hasVideo ? 0.04 : 0.06} blendMode={hasVideo ? 'overlay' : 'multiply'} />
 
       {/* Soft vignette for aged-paper look */}
-      <Vignette innerRadius="45%" outerOpacity={0.2} />
+      <Vignette innerRadius={hasVideo ? '35%' : '45%'} outerOpacity={hasVideo ? 0.4 : 0.2} />
 
       {/* Decorative coffee ring stain — top right area */}
       <div
@@ -87,7 +131,7 @@ export const HandwrittenMessage: React.FC<MessageProps> = ({
           width: isVertical ? 180 : 130,
           height: isVertical ? 180 : 130,
           borderRadius: '50%',
-          border: '3px solid rgba(139, 107, 72, 0.15)',
+          border: `3px solid ${stainBorderColor}`,
           opacity: stainOpacity,
           transform: 'rotate(-15deg)',
         }}
@@ -112,8 +156,9 @@ export const HandwrittenMessage: React.FC<MessageProps> = ({
             fontFamily: 'Caveat, "Dancing Script", cursive',
             fontSize: isVertical ? 52 : 40,
             fontWeight: 400,
-            color: '#3a2e24',
+            color: textColor,
             marginBottom: isVertical ? 35 : 25,
+            textShadow,
           }}
         >
           Dear {to},
@@ -127,9 +172,10 @@ export const HandwrittenMessage: React.FC<MessageProps> = ({
             fontFamily: 'Caveat, "Dancing Script", cursive',
             fontSize: contentFontSize,
             lineHeight: 1.5,
-            color: '#3a2e24',
+            color: textColor,
             maxWidth: isVertical ? 880 : 820,
             fontWeight: 400,
+            textShadow,
           }}
         >
           {content}
@@ -144,8 +190,9 @@ export const HandwrittenMessage: React.FC<MessageProps> = ({
             fontSize: isVertical ? 48 : 36,
             fontStyle: 'italic',
             fontWeight: 400,
-            color: 'rgba(58, 46, 36, 0.7)',
+            color: closingColor,
             marginTop: isVertical ? 50 : 35,
+            textShadow,
           }}
         >
           Always, {from}
@@ -156,15 +203,16 @@ export const HandwrittenMessage: React.FC<MessageProps> = ({
       <div
         style={{
           position: 'absolute',
-          bottom: isVertical ? 280 : 50,
+          bottom: isVertical ? 340 : 50,
           left: 0,
           right: 0,
           textAlign: 'center',
           fontFamily: 'Caveat, "Dancing Script", cursive',
           fontSize: isVertical ? 24 : 18,
-          color: 'rgba(58, 46, 36, 0.4)',
+          color: brandColor,
           opacity: brandOpacity,
           letterSpacing: '2px',
+          textShadow,
         }}
       >
         wordsleftunsent.com

@@ -378,9 +378,8 @@ async function main() {
       }
 
       let renderedCount = 0;
+      let sortedIdx = 0; // Track position in sorted messages across render iterations
       for (let i = 0; i < count; i++) {
-        const msg = sorted[i]; // May be undefined if we've exhausted unused messages
-
         // Pick a fresh template for each video in auto mode
         let videoTemplate = isAutoTemplate
           ? pickWeightedTemplate(autoWeights)
@@ -388,40 +387,40 @@ async function main() {
 
         let maxLen = MAX_CONTENT_LENGTH[videoTemplate] ?? 160;
 
-        // Try to find a message that fits the template
-        let renderMsg = msg;
-        if (renderMsg && renderMsg.content.length > maxLen) {
+        // Find a message that fits — scan through unused messages, don't just take the first
+        let renderMsg: typeof sorted[0] | undefined;
+        for (let j = sortedIdx; j < sorted.length; j++) {
+          const candidate = sorted[j];
+          if (candidate.content.length <= maxLen) {
+            renderMsg = candidate;
+            // Remove from sorted so it's not picked again
+            sorted.splice(j, 1);
+            break;
+          }
           if (isAutoTemplate) {
-            // Try up to 5 other templates before falling back to seeding
-            let found = false;
-            for (let attempt = 0; attempt < 5; attempt++) {
-              const alt = pickWeightedTemplate(autoWeights);
-              const altMax = MAX_CONTENT_LENGTH[alt] ?? 160;
-              if (renderMsg.content.length <= altMax) {
-                videoTemplate = alt;
-                maxLen = altMax;
-                found = true;
-                break;
-              }
+            // Try to find a template that fits this message
+            const fitTemplate = autoWeights.find(
+              ([t]) => candidate.content.length <= (MAX_CONTENT_LENGTH[t] ?? 160),
+            );
+            if (fitTemplate) {
+              videoTemplate = fitTemplate[0];
+              maxLen = MAX_CONTENT_LENGTH[videoTemplate] ?? 160;
+              renderMsg = candidate;
+              sorted.splice(j, 1);
+              break;
             }
-            if (!found) {
-              console.log(`  Message "${renderMsg.content.slice(0, 40)}..." (${renderMsg.content.length} chars) too long — seeding a short one instead`);
-              renderMsg = undefined as unknown as typeof msg;
-            }
-          } else {
-            console.log(`  Message "${renderMsg.content.slice(0, 40)}..." (${renderMsg.content.length} chars) too long for ${videoTemplate} (${maxLen}) — seeding a short one`);
-            renderMsg = undefined as unknown as typeof msg;
           }
         }
 
-        // If no suitable message, seed a new short one from the pool
+        // If no suitable message found among unused, seed a new short one
         if (!renderMsg) {
+          console.log(`  No unused message fits ${videoTemplate} (max ${maxLen} chars) — seeding a short one`);
           const seeded = await seedShortMessage(maxLen);
           if (!seeded) {
             console.log(`  No short messages available for ${videoTemplate} (max ${maxLen} chars). Skipping.`);
             continue;
           }
-          renderMsg = seeded as typeof msg;
+          renderMsg = seeded as typeof sorted[0];
         }
 
         const timestamp = Date.now();

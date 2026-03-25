@@ -136,13 +136,13 @@ export async function renderNextContent(options: {
     let renderedCount = (renderResult.stdout.match(/Queued with message ID tracked/g) ?? []).length;
     console.log(`[auto-render] Rendered ${renderedCount} ${targetPlatform} video(s)`);
 
-    // Step 2b: Render 1 video for YouTube with subscribe CTA (only when no specific platform requested)
+    // Step 2b: Render 1 video for YouTube (only when no specific platform requested)
     if (!platform) {
       try {
-        console.log('[auto-render] Rendering 1 video for YouTube (subscribe CTA)...');
+        console.log('[auto-render] Rendering 1 video for YouTube...');
         const ytResult = await execFileAsync(
           'npx',
-          ['tsx', 'packages/content-engine/src/index.ts', 'render-next', 'CinematicVertical', '1', 'youtube'],
+          ['tsx', 'packages/content-engine/src/index.ts', 'render-next', 'auto', '1', 'youtube'],
           {
             cwd: PROJECT_ROOT,
             env: { ...process.env, PATH: `/opt/homebrew/bin:${process.env.PATH}` },

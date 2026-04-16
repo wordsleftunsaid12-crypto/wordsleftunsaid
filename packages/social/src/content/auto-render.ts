@@ -14,6 +14,7 @@ import {
   getUsedMessageIds,
   createApprovedMessage,
   notifyMessageBecameVideo,
+  pathWithHomebrew,
 } from '@wlu/shared';
 import { MESSAGE_POOL } from './message-seeder.js';
 
@@ -127,7 +128,7 @@ export async function renderNextContent(options: {
       ['tsx', 'packages/content-engine/src/index.ts', 'render-next', 'auto', String(count), targetPlatform],
       {
         cwd: PROJECT_ROOT,
-        env: { ...process.env, PATH: `/opt/homebrew/bin:${process.env.PATH}` },
+        env: { ...process.env, PATH: pathWithHomebrew() },
         timeout: 10 * 60 * 1000, // 10 minutes per render
       },
     );
@@ -136,26 +137,8 @@ export async function renderNextContent(options: {
     let renderedCount = (renderResult.stdout.match(/Queued with message ID tracked/g) ?? []).length;
     console.log(`[auto-render] Rendered ${renderedCount} ${targetPlatform} video(s)`);
 
-    // Step 2b: Render 1 video for YouTube (only when no specific platform requested)
-    if (!platform) {
-      try {
-        console.log('[auto-render] Rendering 1 video for YouTube...');
-        const ytResult = await execFileAsync(
-          'npx',
-          ['tsx', 'packages/content-engine/src/index.ts', 'render-next', 'auto', '1', 'youtube'],
-          {
-            cwd: PROJECT_ROOT,
-            env: { ...process.env, PATH: `/opt/homebrew/bin:${process.env.PATH}` },
-            timeout: 10 * 60 * 1000,
-          },
-        );
-        const ytRendered = (ytResult.stdout.match(/Queued with message ID tracked/g) ?? []).length;
-        renderedCount += ytRendered;
-        console.log(`[auto-render] Rendered ${ytRendered} YouTube video(s)`);
-      } catch (err) {
-        console.warn('[auto-render] YouTube render failed:', err instanceof Error ? err.message : String(err));
-      }
-    }
+    // YouTube is handled via cross-posting from Instagram (publish-job.ts)
+    // so no separate YouTube render is needed.
 
     result.rendered = renderedCount;
     console.log(`[auto-render] Total rendered: ${renderedCount} video(s)`);
@@ -176,7 +159,7 @@ export async function renderNextContent(options: {
       ['tsx', 'packages/content-engine/src/index.ts', 'qa-all'],
       {
         cwd: PROJECT_ROOT,
-        env: { ...process.env, PATH: `/opt/homebrew/bin:${process.env.PATH}` },
+        env: { ...process.env, PATH: pathWithHomebrew() },
         timeout: 5 * 60 * 1000,
       },
     );

@@ -400,6 +400,108 @@ export const MESSAGE_POOL: MessageTemplate[] = [
     to: 'this website',
     content: 'I dont know if anyone actually reads these. Probably not. But just typing it out helped. So thanks I guess.',
   },
+
+  // --- batch 2: short messages (all <=120 chars) ---
+  {
+    from: 'me',
+    to: 'you',
+    content: 'I rehearsed this message a hundred times. None of the versions were brave enough.',
+  },
+  {
+    from: 'anonymous',
+    to: 'my pillow',
+    content: 'you know more about me than any living person and thats kind of embarrassing',
+  },
+  {
+    from: 'Jas',
+    to: 'R',
+    content: 'You said my name different than everyone else. I noticed every time.',
+  },
+  {
+    from: 'your kid',
+    to: 'dad',
+    content: 'I just wanted you to show up. Thats it. Thats all it would have taken.',
+  },
+  {
+    from: 'me',
+    to: 'the one who stayed',
+    content: 'Thank you for not leaving when I gave you every reason to.',
+  },
+  {
+    from: 'tired',
+    to: 'my brain',
+    content: 'Can you please shut up for like five minutes. Im begging you.',
+  },
+  {
+    from: 'anonymous',
+    to: 'the moon',
+    content: 'I wonder if theyre looking at you too right now.',
+  },
+  {
+    from: 'Dee',
+    to: 'past me',
+    content: 'You survived that year. I know you didnt think you would. But you did.',
+  },
+  {
+    from: 'honest',
+    to: 'anyone',
+    content: 'Some days the loneliness is so loud I cant hear anything else.',
+  },
+  {
+    from: 'Cam',
+    to: 'the empty seat',
+    content: 'I still set the table for two sometimes. Force of habit. Or maybe hope.',
+  },
+  {
+    from: 'sorry',
+    to: 'mom',
+    content: 'I turned out just like you. I spent my whole life trying not to.',
+  },
+  {
+    from: 'anonymous',
+    to: 'my old self',
+    content: 'You were so brave. You just didnt know it yet.',
+  },
+  {
+    from: 'V',
+    to: 'the quiet ones',
+    content: 'The loudest people in the room arent the ones hurting the most. Trust me.',
+  },
+  {
+    from: 'broken',
+    to: 'whoever needs this',
+    content: 'Youre not too much. You were just around people who werent enough.',
+  },
+  {
+    from: 'me',
+    to: 'C',
+    content: 'I wrote your number on my hand like it was 2005. Just in case I was brave enough.',
+  },
+  {
+    from: 'Eli',
+    to: 'summer 2019',
+    content: 'Thats when I was happiest and I didnt even know it.',
+  },
+  {
+    from: 'anonymous',
+    to: 'my dog',
+    content: 'You cant read this but you saved my life and I need someone to know that.',
+  },
+  {
+    from: 'still here',
+    to: 'the version of me that almost gave up',
+    content: 'You made it. Its not perfect but youre here. Thats enough.',
+  },
+  {
+    from: 'your friend',
+    to: 'Kat',
+    content: 'You laugh louder when youre sad. I noticed. I always notice.',
+  },
+  {
+    from: 'Ray',
+    to: 'the sunrise',
+    content: 'You showed up today even when nobody asked you to. Respect.',
+  },
 ];
 
 interface SeedOptions {
@@ -421,10 +523,14 @@ export async function seedDailyMessages(
 ): Promise<SeedResult> {
   const { count = 2, dryRun = false } = options;
 
-  // Get existing messages to avoid duplicates
+  // Get existing messages to avoid duplicates (exact + fuzzy)
   const existing = await getApprovedMessages({ limit: 200 });
   const existingContents = new Set(
     existing.map((m) => m.content.toLowerCase().trim()),
+  );
+  // Extract first 50 chars of each existing message for fuzzy dedup
+  const existingPrefixes = new Set(
+    existing.map((m) => m.content.toLowerCase().trim().slice(0, 50)),
   );
 
   // Check how many were seeded today (avoid double-seeding)
@@ -439,10 +545,14 @@ export async function seedDailyMessages(
   const toSeed = count - seededToday;
   console.log(`[seed-messages] Seeding ${toSeed} new messages (${seededToday} already today)...`);
 
-  // Filter to unused templates
-  const available = MESSAGE_POOL.filter(
-    (t) => !existingContents.has(t.content.toLowerCase().trim()),
-  );
+  // Filter to unused templates (exact match + fuzzy prefix dedup)
+  const available = MESSAGE_POOL.filter((t) => {
+    const normalized = t.content.toLowerCase().trim();
+    if (existingContents.has(normalized)) return false;
+    // Fuzzy dedup: skip if the first 50 chars match an existing message
+    if (existingPrefixes.has(normalized.slice(0, 50))) return false;
+    return true;
+  });
 
   if (available.length === 0) {
     console.log('[seed-messages] All templates have been used! Pool exhausted.');

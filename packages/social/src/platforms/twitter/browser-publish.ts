@@ -1,8 +1,10 @@
 import type { Page } from 'playwright';
 import { createPost, getPostCountToday, updateContentQueueStatus } from '@wlu/shared';
 import { launchTwitter } from './browser.js';
+import { warmupBrowser } from '../warmup.js';
 
-const MAX_POSTS_PER_DAY = 3;
+// Reduced from 3 → 2 (Apr 2026) — X allows more but stay conservative.
+const MAX_POSTS_PER_DAY = 2;
 
 interface TwitterPublishResult {
   postId: string;
@@ -57,10 +59,31 @@ export async function browserPublishTwitter(options: {
   const { context, page } = await launchTwitter();
 
   try {
+    // Warm up: scroll home feed before composing
+    await warmupBrowser(page, { feedUrl: 'https://x.com/home' });
+
     console.log('[twitter-publish] Composing tweet...');
     await composeTweet(page, tweetText, options.coverImagePath);
 
     console.log('[twitter-publish] Tweet posted successfully!');
+
+    // Extract post URL from profile (newest tweet = first status link)
+    let platformPostUrl: string | undefined;
+    try {
+      await page.goto('https://x.com/unsentwords12', {
+        waitUntil: 'domcontentloaded',
+        timeout: 30000,
+      });
+      await page.waitForTimeout(5000);
+      const firstTweet = page.locator('a[href*="/unsentwords12/status/"]').first();
+      const href = await firstTweet.getAttribute('href', { timeout: 5000 }).catch(() => null);
+      if (href) {
+        platformPostUrl = href.startsWith('http') ? href : `https://x.com${href}`;
+        console.log(`[twitter-publish] Extracted post URL: ${platformPostUrl}`);
+      }
+    } catch {
+      console.warn('[twitter-publish] Could not extract post URL from profile');
+    }
 
     const post = await createPost({
       platform: 'twitter',
@@ -71,6 +94,7 @@ export async function browserPublishTwitter(options: {
       mood: options.mood,
       postType: 'feed',
       isExploration: options.isExploration,
+      platformPostUrl,
     });
 
     if (options.contentQueueId) {

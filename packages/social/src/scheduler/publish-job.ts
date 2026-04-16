@@ -4,6 +4,7 @@ import {
   createContentQueueItem,
   hasPostForMessages,
   hasQueueItemForMessages,
+  hasAnyQueueItemForVideo,
   getMessageById,
   getLastPostTime,
   MAX_CONTENT_LENGTH,
@@ -16,30 +17,40 @@ import { getNextSlotForPlatform } from './queue.js';
 /** Minimum hours between posts on the same platform. */
 const MIN_POST_INTERVAL_HOURS = 2;
 
-/** Platforms to auto-cross-post to after a successful publish. */
+/** Platforms to auto-cross-post to after a successful publish. Threads disabled. */
 const CROSS_POST_TARGETS: Record<string, string[]> = {
-  instagram: ['tiktok', 'reddit', 'pinterest', 'twitter', 'threads'],
+  instagram: ['tiktok', 'youtube', 'reddit', 'pinterest', 'twitter'],
   tiktok: [],
   youtube: [],
   reddit: [],
   pinterest: [],
   twitter: [],
-  threads: [],
 };
 
 /** Platforms that include clickable links in their posts (get UTM tracking). */
-const LINK_PLATFORMS = new Set(['reddit', 'twitter', 'threads', 'pinterest']);
+const LINK_PLATFORMS = new Set(['reddit', 'twitter', 'pinterest']);
 
-/** Default hashtags appended to TikTok posts for discovery. */
-const TIKTOK_DEFAULT_HASHTAGS = [
-  '#wordsleftunsent',
-  '#fyp',
-  '#relatable',
-  '#emotional',
-  '#unsentletters',
-  '#deepquotes',
-  '#mentalhealthawareness',
+/**
+ * Fallback TikTok hashtags — only used when the content queue item
+ * somehow arrives with no hashtags. Picks a rotated subset to avoid
+ * identical fallback strings across posts.
+ */
+const TIKTOK_FALLBACK_ANCHOR = '#wordsleftunsent';
+const TIKTOK_FALLBACK_POOL = [
+  '#fyp', '#foryou', '#foryoupage', '#relatable', '#emotional', '#unsentletters',
+  '#deepquotes', '#mentalhealthawareness', '#heartbreak', '#healing',
+  '#breakuptok', '#sadtok', '#softgirlera',
 ];
+
+function buildTikTokFallbackHashtags(): string[] {
+  const pool = [...TIKTOK_FALLBACK_POOL];
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  const n = 5 + Math.floor(Math.random() * 3); // 5-7 tags
+  return [TIKTOK_FALLBACK_ANCHOR, ...pool.slice(0, n - 1)];
+}
 
 /**
  * Check for the next scheduled item and publish it if due.
@@ -98,7 +109,7 @@ export async function publishNextScheduled(
     // For TikTok, ensure posts always have discovery hashtags
     let hashtagString = (item.hashtags ?? []).join(' ');
     if (platform === 'tiktok' && !hashtagString) {
-      hashtagString = TIKTOK_DEFAULT_HASHTAGS.join(' ');
+      hashtagString = buildTikTokFallbackHashtags().join(' ');
     }
 
     let rawCaption = `${item.caption ?? ''}\n\n${hashtagString}`.trim();
@@ -162,30 +173,50 @@ export async function publishNextScheduled(
       );
       result = await browserPublishTwitter(publishOptions);
     } else if (platform === 'threads') {
-      const { browserPublishThreads } = await import(
-        '../platforms/threads/browser-publish.js'
-      );
-      result = await browserPublishThreads(publishOptions);
+      // Threads publishing disabled — requires selfie verification.
+      // Any remaining threads items in the queue should be skipped.
+      console.log(`[publish-job] Threads is disabled — marking ${item.id.slice(0, 8)} as failed`);
+      await updateContentQueueStatus(item.id, 'failed', {
+        errorMessage: 'Threads disabled: requires selfie human verification',
+      });
+      return false;
     } else {
       result = await browserPublishReel(publishOptions);
     }
 
     console.log(`[publish-job] Published! Post ID: ${result.postId}`);
 
-    // Cross-post: queue the same video for other platforms (with dedup)
+    // Cross-post: queue the same video for other platforms (with dedup).
+    // Stretch the targets across several hours — we use a rolling "earliest
+    // allowed time" so each subsequent cross-post is scheduled at least
+    // 90-180 minutes after the previous one. This avoids the pattern where
+    // Instagram publishes → all 4 cross-posts land in the same preferred-hour
+    // cluster, which reads as bot activity to the platforms.
     const targets = CROSS_POST_TARGETS[platform] ?? [];
+    let rollingFloor = new Date(Date.now() + 90 * 60000); // start at least 90m out
     for (const target of targets) {
       const targetPlatform = target as import('@wlu/shared').Platform;
       try {
-        const alreadyPosted = await hasPostForMessages(targetPlatform, item.messageIds);
-        if (alreadyPosted) {
-          console.log(`[publish-job] Skipping cross-post → ${target} (already posted)`);
-          continue;
-        }
-        const alreadyQueued = await hasQueueItemForMessages(targetPlatform, item.messageIds);
-        if (alreadyQueued) {
-          console.log(`[publish-job] Skipping cross-post → ${target} (already queued)`);
-          continue;
+        // Dedup: check by messageIds first, fall back to videoPath for items with empty messageIds
+        const hasMessageIds = item.messageIds && item.messageIds.length > 0;
+        if (hasMessageIds) {
+          const alreadyPosted = await hasPostForMessages(targetPlatform, item.messageIds);
+          if (alreadyPosted) {
+            console.log(`[publish-job] Skipping cross-post → ${target} (already posted)`);
+            continue;
+          }
+          const alreadyQueued = await hasQueueItemForMessages(targetPlatform, item.messageIds);
+          if (alreadyQueued) {
+            console.log(`[publish-job] Skipping cross-post → ${target} (already queued)`);
+            continue;
+          }
+        } else if (item.videoPath) {
+          // Fallback: dedup by video file path when messageIds are empty
+          const alreadyExists = await hasAnyQueueItemForVideo(targetPlatform, item.videoPath);
+          if (alreadyExists) {
+            console.log(`[publish-job] Skipping cross-post → ${target} (video already queued/posted)`);
+            continue;
+          }
         }
 
         const crossPost = await createContentQueueItem({
@@ -197,12 +228,16 @@ export async function publishNextScheduled(
           platform: targetPlatform,
           isExploration: item.isExploration,
         });
-        const nextSlot = await getNextSlotForPlatform(targetPlatform);
+        const nextSlot = await getNextSlotForPlatform(targetPlatform, rollingFloor);
         await updateContentQueueStatus(crossPost.id, 'scheduled', {
           caption: item.caption ?? undefined,
           hashtags: item.hashtags ?? undefined,
           scheduledFor: nextSlot.toISOString(),
         });
+        // Advance the floor by 90-180 random minutes from the slot we just
+        // scheduled — the next cross-post target lands at least that far after.
+        const gapMs = (90 + Math.random() * 90) * 60000;
+        rollingFloor = new Date(nextSlot.getTime() + gapMs);
         console.log(`[publish-job] Cross-posted → ${target} scheduled for ${nextSlot.toISOString()} (${crossPost.id.slice(0, 8)})`);
       } catch (err) {
         console.warn(`[publish-job] Cross-post to ${target} failed:`, err instanceof Error ? err.message : err);

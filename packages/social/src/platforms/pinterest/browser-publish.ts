@@ -5,9 +5,11 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { createPost, getPostCountToday, updateContentQueueStatus } from '@wlu/shared';
 import { launchPinterest } from './browser.js';
+import { warmupBrowser } from '../warmup.js';
 
 const execFileAsync = promisify(execFile);
-const MAX_POSTS_PER_DAY = 3;
+// Reduced from 3 → 2 (Apr 2026).
+const MAX_POSTS_PER_DAY = 2;
 const PINTEREST_BOARD_NAME = 'Unsent Letters';
 
 interface PinterestPublishResult {
@@ -87,10 +89,20 @@ export async function browserPublishPinterest(options: {
   const { context, page } = await launchPinterest();
 
   try {
+    // Warm up: scroll Pinterest home for a bit before creating pin
+    await warmupBrowser(page, { feedUrl: 'https://www.pinterest.com/' });
+
     console.log('[pinterest-publish] Creating pin...');
     await createPin(page, imagePath, pinDescription, pinUrl);
 
     console.log('[pinterest-publish] Pin created successfully!');
+
+    // Extract pin URL if Pinterest navigated to the pin page
+    const finalUrl = page.url();
+    const platformPostUrl = finalUrl.includes('/pin/') ? finalUrl : undefined;
+    if (platformPostUrl) {
+      console.log(`[pinterest-publish] Pin URL: ${platformPostUrl}`);
+    }
 
     const post = await createPost({
       platform: 'pinterest',
@@ -101,6 +113,7 @@ export async function browserPublishPinterest(options: {
       mood: options.mood,
       postType: 'feed',
       isExploration: options.isExploration,
+      platformPostUrl,
     });
 
     if (options.contentQueueId) {

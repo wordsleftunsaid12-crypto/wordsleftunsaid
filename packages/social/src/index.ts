@@ -18,6 +18,10 @@ async function main(): Promise<void> {
     case 'schedule': {
       const { startScheduler } = await import('./scheduler/scheduler.js');
       // When no --platform flag given, run across all platforms
+      if (platformFlag === 'threads') {
+        console.error('Threads is disabled.');
+        process.exit(1);
+      }
       await startScheduler({ platform: platformFlag, dryRun });
       break;
     }
@@ -53,9 +57,6 @@ async function main(): Promise<void> {
       } else if (platform === 'twitter') {
         const { runTwitterOutboundSession } = await import('./engagement/outbound-twitter.js');
         await runTwitterOutboundSession({ dryRun });
-      } else if (platform === 'threads') {
-        const { runThreadsOutboundSession } = await import('./engagement/outbound-threads.js');
-        await runThreadsOutboundSession({ dryRun });
       } else {
         const { runOutboundSession } = await import('./engagement/outbound.js');
         await runOutboundSession({ dryRun });
@@ -95,6 +96,13 @@ async function main(): Promise<void> {
       break;
     }
 
+    case 'collect-metrics': {
+      const { collectEngagementMetrics } = await import('./collectors/engagement.js');
+      const platforms = platformFlag ? [platformFlag] : undefined;
+      await collectEngagementMetrics({ platforms });
+      break;
+    }
+
     case 'status': {
       const { getQueueStatus } = await import('./scheduler/queue.js');
       const status = await getQueueStatus(platform);
@@ -118,12 +126,13 @@ async function main(): Promise<void> {
       console.log('  engage         Reply to comments on recent posts');
       console.log('  outbound       Like/follow/comment on related accounts');
       console.log('  unfollow       Unfollow non-followers (Instagram, TikTok, YouTube)');
+      console.log('  collect-metrics Scrape engagement metrics from all platforms');
       console.log('  followers      Scrape follower counts from all platforms');
       console.log('  seed-messages  Seed website with new anonymous messages');
       console.log('  status         Show content queue status');
       console.log('\nFlags:');
       console.log('  --dry-run            Log actions without executing');
-      console.log('  --platform=instagram  Target platform (instagram|tiktok|youtube|reddit|twitter|threads|pinterest)');
+      console.log('  --platform=instagram  Target platform (instagram|tiktok|youtube|reddit|twitter|pinterest)');
       console.log('  --count=2            Number of messages to seed (seed-messages)');
   }
 }

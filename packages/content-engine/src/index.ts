@@ -323,6 +323,20 @@ async function main() {
       const isAutoTemplate = rawTemplate === 'auto';
       const autoWeights = getTemplateWeights(targetPlatform);
 
+      // Track recently-used templates to prevent back-to-back repeats.
+      // Seed with the last 2 templates posted/scheduled on this platform.
+      const recentTemplates = new Set<CompositionId>();
+      if (isAutoTemplate) {
+        const { getContentQueue } = await import('@wlu/shared');
+        const recent = await getContentQueue({ platform: targetPlatform, limit: 2 });
+        for (const item of recent) {
+          if (item.template) recentTemplates.add(item.template as CompositionId);
+        }
+        if (recentTemplates.size > 0) {
+          console.log(`  Recent templates (excluded): ${[...recentTemplates].join(', ')}`);
+        }
+      }
+
       /**
        * Seed a new short message from the pool that fits the given max length.
        * Returns the newly created DB message, or null if no suitable pool entry exists.
@@ -380,9 +394,9 @@ async function main() {
       let renderedCount = 0;
       let sortedIdx = 0; // Track position in sorted messages across render iterations
       for (let i = 0; i < count; i++) {
-        // Pick a fresh template for each video in auto mode
+        // Pick a fresh template for each video in auto mode, excluding recent ones
         let videoTemplate = isAutoTemplate
-          ? pickWeightedTemplate(autoWeights)
+          ? pickWeightedTemplate(autoWeights, recentTemplates)
           : template;
 
         let maxLen = MAX_CONTENT_LENGTH[videoTemplate] ?? 160;
@@ -498,6 +512,7 @@ async function main() {
           isExploration: false,
         });
         console.log(`  Queued with message ID tracked.\n`);
+        recentTemplates.add(videoTemplate);
         renderedCount++;
       }
 

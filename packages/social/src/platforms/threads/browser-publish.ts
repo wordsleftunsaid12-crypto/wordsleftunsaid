@@ -69,6 +69,24 @@ export async function browserPublishThreads(options: {
 
     console.log('[threads-publish] Thread posted successfully!');
 
+    // Extract post URL from profile (newest thread = first post link)
+    let platformPostUrl: string | undefined;
+    try {
+      await page.goto('https://www.threads.net/@u.wordsleftunsent', {
+        waitUntil: 'domcontentloaded',
+        timeout: 30000,
+      });
+      await page.waitForTimeout(5000);
+      const firstPost = page.locator('a[href*="/post/"]').first();
+      const href = await firstPost.getAttribute('href', { timeout: 5000 }).catch(() => null);
+      if (href) {
+        platformPostUrl = href.startsWith('http') ? href : `https://www.threads.net${href}`;
+        console.log(`[threads-publish] Extracted post URL: ${platformPostUrl}`);
+      }
+    } catch {
+      console.warn('[threads-publish] Could not extract post URL from profile');
+    }
+
     const post = await createPost({
       platform: 'threads',
       contentQueueId: options.contentQueueId,
@@ -78,6 +96,7 @@ export async function browserPublishThreads(options: {
       mood: options.mood,
       postType: 'feed',
       isExploration: options.isExploration,
+      platformPostUrl,
     });
 
     if (options.contentQueueId) {

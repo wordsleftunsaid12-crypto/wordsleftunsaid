@@ -10,9 +10,9 @@ import type { Post, Platform } from '@wlu/shared';
 import { withBrowserLock } from '../platforms/browser-lock.js';
 import { resolve } from 'node:path';
 
-/** All platforms we post to and can verify. */
+/** All platforms we post to and can verify. Threads disabled. */
 const VERIFIABLE_PLATFORMS: Platform[] = [
-  'instagram', 'tiktok', 'youtube', 'reddit', 'twitter', 'threads', 'pinterest',
+  'instagram', 'tiktok', 'youtube', 'reddit', 'twitter', 'pinterest',
 ];
 
 /** Map platform → browser session directory. */
@@ -22,12 +22,11 @@ const SESSION_DIRS: Record<string, string> = {
   youtube: resolve(process.env.HOME ?? '.', '.wlu-youtube-session'),
   reddit: resolve(process.env.HOME ?? '.', '.wlu-reddit-session'),
   twitter: resolve(process.env.HOME ?? '.', '.wlu-twitter-session'),
-  threads: resolve(process.env.HOME ?? '.', '.wlu-threads-session'),
   pinterest: resolve(process.env.HOME ?? '.', '.wlu-pinterest-session'),
 };
 
 /** Max time (ms) a single platform verification can take. */
-const VERIFY_TIMEOUT_MS = 60_000;
+const VERIFY_TIMEOUT_MS = 90_000;
 
 interface PlatformVerifyResult {
   platform: Platform;
@@ -80,11 +79,6 @@ async function getPlatformCount(
     case 'twitter': {
       const { verifyTwitterPost } = await import('./verify-twitter.js');
       const r = await verifyTwitterPost(dummy);
-      return { platformCount: r.platformCount, screenshotPath: r.screenshotPath };
-    }
-    case 'threads': {
-      const { verifyThreadsPost } = await import('./verify-threads.js');
-      const r = await verifyThreadsPost(dummy);
       return { platformCount: r.platformCount, screenshotPath: r.screenshotPath };
     }
     case 'pinterest': {

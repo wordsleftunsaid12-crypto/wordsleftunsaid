@@ -16,7 +16,7 @@ import { getWebsiteMetrics, getYesterdayMetrics } from './ga4.js';
 
 const ALL_PLATFORMS: Platform[] = [
   'instagram', 'tiktok', 'youtube',
-  'reddit', 'pinterest', 'twitter', 'threads',
+  'reddit', 'pinterest', 'twitter',
 ];
 
 const SUMMARY_DIR = resolve(process.env.HOME ?? '.', '.wlu-daily-summaries');

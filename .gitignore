@@ -6,6 +6,7 @@ output/
 *.mov
 *.mp3
 packages/content-engine/assets/
+packages/content-engine/public/
 .env
 .env.local
 .env.*.local
@@ -13,6 +14,7 @@ packages/content-engine/assets/
 resources/accounts.txt
 .claude/plans/
 .claude/settings.local.json
+.claude/skills/
 packages/website/.netlify/
 # tsc build artifacts in source dirs
 packages/shared/src/**/*.d.ts

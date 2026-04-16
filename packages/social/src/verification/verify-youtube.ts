@@ -11,7 +11,8 @@ interface VerificationResult {
 
 /**
  * Verify YouTube Shorts by counting them in YouTube Studio.
- * Navigates to Studio's Shorts tab and counts video entries.
+ * Navigates to Studio's Shorts tab and counts ytcp-video-row elements,
+ * scrolling to load all rows (Studio virtualizes long lists).
  */
 export async function verifyYouTubePost(post: Post): Promise<VerificationResult> {
   const { context, page } = await launchYouTube();
@@ -24,47 +25,40 @@ export async function verifyYouTubePost(post: Post): Promise<VerificationResult>
     });
     await page.waitForTimeout(5000);
 
-    // Take screenshot of Studio shorts list
     const screenshotPath = '/tmp/verify-youtube-studio.png';
     await page.screenshot({ path: screenshotPath }).catch(() => {});
 
-    // Count video rows in the content table
-    // YouTube Studio shows a table with one row per video
-    const videoRows = page.locator('ytcp-video-row, tr.video-row, [class*="video-row"]');
-    let rowCount = await videoRows.count();
+    // Count ytcp-video-row elements — these are the ONLY reliable indicator
+    // of actual video entries in Studio's content table.
+    // Studio virtualizes the list, so we need to scroll to load all rows.
+    let rowCount = 0;
+    let prevCount = -1;
+    const maxScrolls = 20; // Safety limit — even with 100+ videos this is enough
+
+    for (let scroll = 0; scroll <= maxScrolls; scroll++) {
+      const rows = page.locator('ytcp-video-row');
+      rowCount = await rows.count();
+
+      if (rowCount === prevCount) {
+        // No new rows loaded — we've reached the end
+        break;
+      }
+      prevCount = rowCount;
+
+      if (scroll < maxScrolls) {
+        // Scroll down to trigger lazy loading
+        await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+        await page.waitForTimeout(1500);
+      }
+    }
 
     if (rowCount > 0) {
       console.log(`[verify-yt] Studio shows ${rowCount} shorts`);
       return { verified: true, platformCount: rowCount, screenshotPath };
     }
 
-    // Fallback: count by looking at thumbnail links in the content list
-    const videoLinks = page.locator('a[href*="/video/"], a[href*="/shorts/"]');
-    rowCount = await videoLinks.count();
-    // Deduplicate — each video might have multiple links (title + thumbnail)
-    if (rowCount > 0) {
-      // Rough dedup: each video typically has 2 links (thumbnail + title)
-      const hrefs = new Set<string>();
-      for (let i = 0; i < rowCount; i++) {
-        const href = await videoLinks.nth(i).getAttribute('href').catch(() => null);
-        if (href) hrefs.add(href);
-      }
-      const uniqueCount = hrefs.size;
-      console.log(`[verify-yt] Studio shows ${uniqueCount} unique video links`);
-      return { verified: true, platformCount: uniqueCount, screenshotPath };
-    }
-
-    // Try reading the page text for a count indicator
+    // Check if Studio loaded at all
     const bodyText = await page.textContent('body').catch(() => '') ?? '';
-    // YouTube Studio sometimes shows "Shorts (N)" in the tab
-    const shortsMatch = bodyText.match(/Shorts?\s*\(?(\d+)\)?/i);
-    if (shortsMatch) {
-      const count = parseInt(shortsMatch[1], 10);
-      console.log(`[verify-yt] Studio tab shows ${count} shorts`);
-      return { verified: true, platformCount: count, screenshotPath };
-    }
-
-    // Check if Studio loaded
     if (bodyText.includes('Channel content') || bodyText.includes('Shorts')) {
       console.log('[verify-yt] Studio loaded but no shorts found');
       return { verified: true, platformCount: 0, screenshotPath };

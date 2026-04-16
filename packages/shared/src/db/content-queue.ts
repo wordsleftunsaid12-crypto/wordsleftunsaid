@@ -209,3 +209,46 @@ export async function getContentQueueItemByVideoPath(
   if (error) throw new Error(`Failed to check content queue: ${error.message}`);
   return data.length > 0 ? mapRow(data[0] as Record<string, unknown>) : null;
 }
+
+/**
+ * Check if a content_queue item already exists for the given video path
+ * on the target platform in a non-terminal state.
+ */
+export async function hasQueueItemForVideo(
+  platform: string,
+  videoPath: string,
+): Promise<boolean> {
+  const client = getServiceClient();
+
+  const { data, error } = await client
+    .from('content_queue')
+    .select('id')
+    .eq('platform', platform)
+    .eq('video_path', videoPath)
+    .not('status', 'in', '("posted","failed")')
+    .limit(1);
+
+  if (error) throw new Error(`Failed to check content queue by video: ${error.message}`);
+  return (data?.length ?? 0) > 0;
+}
+
+/**
+ * Check if ANY content_queue item exists for the given video path on the target
+ * platform (including posted/failed). Used as a fallback when messageIds are empty.
+ */
+export async function hasAnyQueueItemForVideo(
+  platform: string,
+  videoPath: string,
+): Promise<boolean> {
+  const client = getServiceClient();
+
+  const { data, error } = await client
+    .from('content_queue')
+    .select('id')
+    .eq('platform', platform)
+    .eq('video_path', videoPath)
+    .limit(1);
+
+  if (error) throw new Error(`Failed to check content queue by video: ${error.message}`);
+  return (data?.length ?? 0) > 0;
+}

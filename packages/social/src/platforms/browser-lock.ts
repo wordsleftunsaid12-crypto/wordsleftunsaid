@@ -3,12 +3,16 @@
  * Prevents ProcessSingleton errors when multiple scheduler jobs
  * try to open the same browser profile directory simultaneously.
  *
- * Also cleans up stale SingletonLock files left by orphaned Chrome processes.
+ * Also cleans up stale SingletonLock/SingletonCookie/SingletonSocket files
+ * left behind by orphaned Chrome processes (e.g. after laptop sleep/crash).
  */
-import { readlinkSync, unlinkSync, existsSync } from 'node:fs';
+import { readlinkSync, unlinkSync, existsSync, lstatSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const locks = new Map<string, Promise<void>>();
+
+/** Chrome's ProcessSingleton files — all three must be cleared together. */
+const SINGLETON_FILES = ['SingletonLock', 'SingletonCookie', 'SingletonSocket'] as const;
 
 /**
  * Check if a process with the given PID is running.
@@ -22,45 +26,104 @@ function isProcessAlive(pid: number): boolean {
   }
 }
 
+/** Wait (busy-loop free) until pid exits or timeout elapses. */
+async function waitForProcessExit(pid: number, timeoutMs: number): Promise<boolean> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (!isProcessAlive(pid)) return true;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  return !isProcessAlive(pid);
+}
+
+/** Remove a singleton file/symlink if it exists. Silently ignores errors. */
+function unlinkSingleton(sessionDir: string, name: string): void {
+  const p = resolve(sessionDir, name);
+  try {
+    // lstatSync won't follow symlinks — needed so we detect dangling ones
+    lstatSync(p);
+    unlinkSync(p);
+  } catch {
+    // Doesn't exist or can't remove — ignore
+  }
+}
+
+/** Remove all ProcessSingleton files for a session. */
+function removeAllSingletons(sessionDir: string): void {
+  for (const name of SINGLETON_FILES) {
+    unlinkSingleton(sessionDir, name);
+  }
+}
+
 /**
- * Remove stale SingletonLock if the Chrome process that created it is dead.
- * The lock is a symlink like: SingletonLock -> hostname-PID
+ * Remove stale ProcessSingleton files if the Chrome process that created
+ * them is dead. The lock is a symlink like: SingletonLock -> hostname-PID.
+ * If the PID is alive but belongs to an orphan from a previous session,
+ * SIGTERM it and then clean all three singleton files together.
  */
-function cleanStaleLock(sessionDir: string): void {
+async function cleanStaleLock(sessionDir: string): Promise<void> {
   const lockPath = resolve(sessionDir, 'SingletonLock');
-  if (!existsSync(lockPath)) return;
+  if (!existsSync(lockPath)) {
+    // SingletonLock is gone but Cookie/Socket may linger — clean them too.
+    // These often survive crashes and cause "profile already in use" errors
+    // on the next launch even though no Chrome is running.
+    for (const stray of ['SingletonCookie', 'SingletonSocket']) {
+      const p = resolve(sessionDir, stray);
+      if (existsSync(p)) {
+        console.log(`[browser-lock] Removing stray ${stray} in ${sessionDir}`);
+        unlinkSingleton(sessionDir, stray);
+      }
+    }
+    return;
+  }
 
   try {
     const target = readlinkSync(lockPath); // e.g. "Nicolass-MacBook-Air.local-25810"
     const dashIdx = target.lastIndexOf('-');
-    if (dashIdx === -1) return;
+    if (dashIdx === -1) {
+      // Malformed symlink — nuke all three
+      console.log(`[browser-lock] Removing malformed singleton files in ${sessionDir}`);
+      removeAllSingletons(sessionDir);
+      return;
+    }
 
     const pid = Number(target.slice(dashIdx + 1));
-    if (Number.isNaN(pid) || pid <= 0) return;
+    if (Number.isNaN(pid) || pid <= 0) {
+      removeAllSingletons(sessionDir);
+      return;
+    }
 
     if (!isProcessAlive(pid)) {
-      console.log(`[browser-lock] Removing stale SingletonLock (dead PID ${pid}) in ${sessionDir}`);
-      unlinkSync(lockPath);
-    } else {
-      // Process is alive — try to kill it (orphaned Chrome from a previous session)
-      console.log(`[browser-lock] Killing orphaned Chrome PID ${pid} for ${sessionDir}`);
-      try {
-        process.kill(pid, 'SIGTERM');
-        // Give it a moment to exit
-        const start = Date.now();
-        while (isProcessAlive(pid) && Date.now() - start < 3000) {
-          // busy-wait up to 3s
-        }
-        if (!isProcessAlive(pid)) {
-          unlinkSync(lockPath);
-          console.log(`[browser-lock] Killed and cleaned lock for PID ${pid}`);
-        }
-      } catch {
-        // Can't kill — leave it
+      console.log(`[browser-lock] Removing stale singleton files (dead PID ${pid}) in ${sessionDir}`);
+      removeAllSingletons(sessionDir);
+      return;
+    }
+
+    // Process is alive — assume orphan from a previous session and kill it
+    console.log(`[browser-lock] Killing orphaned Chrome PID ${pid} for ${sessionDir}`);
+    try {
+      process.kill(pid, 'SIGTERM');
+      const exited = await waitForProcessExit(pid, 3000);
+      if (!exited) {
+        console.warn(`[browser-lock] PID ${pid} did not exit after SIGTERM, sending SIGKILL`);
+        try { process.kill(pid, 'SIGKILL'); } catch { /* ignore */ }
+        await waitForProcessExit(pid, 1000);
+      }
+      if (!isProcessAlive(pid)) {
+        removeAllSingletons(sessionDir);
+        console.log(`[browser-lock] Cleaned singleton files for PID ${pid}`);
+      } else {
+        console.warn(`[browser-lock] PID ${pid} still alive — leaving singletons in place`);
+      }
+    } catch {
+      // Can't signal (permission or ESRCH) — still try to clean
+      if (!isProcessAlive(pid)) {
+        removeAllSingletons(sessionDir);
       }
     }
   } catch {
-    // readlinkSync fails if not a symlink — ignore
+    // readlinkSync fails if not a symlink — treat as malformed
+    removeAllSingletons(sessionDir);
   }
 }
 
@@ -88,10 +151,21 @@ export async function withBrowserLock<T>(
 
   try {
     // Clean up stale OS-level locks before launching
-    cleanStaleLock(sessionDir);
+    await cleanStaleLock(sessionDir);
     return await fn();
   } finally {
     locks.delete(sessionDir);
     resolve!();
+  }
+}
+
+/**
+ * Explicit startup cleanup: sweep a list of session dirs and remove any
+ * stale ProcessSingleton files. Use this once at scheduler startup to
+ * recover from prior crashes/laptop sleep.
+ */
+export async function cleanStaleSingletons(sessionDirs: string[]): Promise<void> {
+  for (const dir of sessionDirs) {
+    await cleanStaleLock(dir);
   }
 }

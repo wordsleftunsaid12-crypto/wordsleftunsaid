@@ -11,8 +11,7 @@ interface VerificationResult {
 
 /**
  * Verify TikTok posts by counting videos on the profile.
- * Navigates to our profile, reads the video count from the stats header,
- * and takes a screenshot as evidence.
+ * Counts visible video thumbnail elements on the profile grid.
  */
 export async function verifyTikTokPost(post: Post): Promise<VerificationResult> {
   const { context, page } = await launchTikTok();
@@ -23,8 +22,6 @@ export async function verifyTikTokPost(post: Post): Promise<VerificationResult> 
 
     // Dismiss cookie consent and other modals that block content
     await dismissModals(page);
-
-    // Also try the explicit cookie banner buttons (TikTok shows a full-page overlay)
     const allowCookiesBtn = page.getByRole('button', { name: /allow all|accept all|allow cookies/i }).first();
     const declineCookiesBtn = page.getByRole('button', { name: /decline optional|reject/i }).first();
     for (const btn of [declineCookiesBtn, allowCookiesBtn]) {
@@ -35,57 +32,50 @@ export async function verifyTikTokPost(post: Post): Promise<VerificationResult> 
         break;
       }
     }
-
     await page.waitForTimeout(3000);
 
-    // Take screenshot of profile
     const screenshotPath = '/tmp/verify-tiktok-profile.png';
     await page.screenshot({ path: screenshotPath }).catch(() => {});
 
-    // Detect CAPTCHA / security puzzle that blocks profile access
-    const bodyHtml = await page.textContent('body').catch(() => '') ?? '';
-    const hasCaptcha =
-      bodyHtml.includes('Drag the slider') ||
-      bodyHtml.includes('fit the puzzle') ||
-      bodyHtml.includes('Verify to continue');
-    if (hasCaptcha) {
-      console.warn('[verify-tk] CAPTCHA detected — cannot verify, skipping');
-      return {
-        verified: false,
-        platformCount: -1, // Signal: blocked, not a real count
-        error: 'CAPTCHA blocked profile access — skipping verification',
-        screenshotPath,
-      };
-    }
-
-    // Read the body text to find video count
-    // TikTok profiles show: "X Following  Y Followers  Z Likes" and video count near tabs
+    // Detect CAPTCHA
     const bodyText = await page.textContent('body').catch(() => '') ?? '';
-
-    // Try to find "X Videos" text (TikTok shows this in the tabs area)
-    const videoCountMatch = bodyText.match(/(\d[\d,]*)\s*Videos?/i);
-    if (videoCountMatch) {
-      const count = parseInt(videoCountMatch[1].replace(/,/g, ''), 10);
-      console.log(`[verify-tk] Profile shows ${count} videos`);
-      return { verified: true, platformCount: count, screenshotPath };
+    if (bodyText.includes('Drag the slider') || bodyText.includes('fit the puzzle') || bodyText.includes('Verify to continue')) {
+      console.warn('[verify-tk] CAPTCHA detected — cannot verify, skipping');
+      return { verified: false, platformCount: -1, error: 'CAPTCHA blocked profile access', screenshotPath };
     }
 
-    // Fallback: count video thumbnails on the profile
-    const videoSelectors = [
-      '[data-e2e="user-post-item"]',
-      'div[class*="DivItemContainer"]',
-      'div[class*="DivVideoFeed"] a',
-      'a[href*="/video/"]',
-      // TikTok also uses @username/video/ID pattern in links
-      `a[href*="/@u.wordsleftunsaid/video/"]`,
-    ];
+    // Count video elements directly — prioritize this over regex.
+    // Scroll to load all videos (TikTok lazy-loads the grid).
+    let totalCount = 0;
+    let prevCount = -1;
+    const maxScrolls = 15;
 
-    for (const selector of videoSelectors) {
-      const count = await page.locator(selector).count();
-      if (count > 0) {
-        console.log(`[verify-tk] Found ${count} video elements (via ${selector})`);
-        return { verified: true, platformCount: count, screenshotPath };
+    for (let scroll = 0; scroll <= maxScrolls; scroll++) {
+      // Try multiple selectors — TikTok obfuscates class names
+      const selectors = [
+        '[data-e2e="user-post-item"]',
+        `a[href*="/video/"]`,
+      ];
+
+      let bestCount = 0;
+      for (const selector of selectors) {
+        const count = await page.locator(selector).count();
+        if (count > bestCount) bestCount = count;
       }
+      totalCount = bestCount;
+
+      if (totalCount === prevCount || totalCount === 0) break;
+      prevCount = totalCount;
+
+      if (scroll < maxScrolls) {
+        await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+        await page.waitForTimeout(2000);
+      }
+    }
+
+    if (totalCount > 0) {
+      console.log(`[verify-tk] Profile shows ${totalCount} videos`);
+      return { verified: true, platformCount: totalCount, screenshotPath };
     }
 
     // Check if profile loaded at all

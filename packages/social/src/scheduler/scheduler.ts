@@ -1,21 +1,19 @@
 import { resolve } from 'node:path';
-import { unlinkSync, readlinkSync } from 'node:fs';
 import { jitteredInterval, INTERVALS } from './timing.js';
 import { scheduleCaptionedItems, getQueueStatus, catchUpMissedSlots } from './queue.js';
 import { captionPendingItems } from '../captions/generate.js';
-import { ingestNewVideos } from '../ingest.js';
 import { publishNextScheduled } from './publish-job.js';
 import { runCommentResponder } from '../engagement/comment-responder.js';
 import { collectFollowerSnapshot } from '../collectors/followers.js';
 import { seedDailyMessages } from '../content/message-seeder.js';
 import { saveLastRun, getSecondsSinceLastRun, installTimestampLogger } from './state.js';
-import { withBrowserLock } from '../platforms/browser-lock.js';
-import { getContentQueue, withRetry } from '@wlu/shared';
+import { withBrowserLock, cleanStaleSingletons } from '../platforms/browser-lock.js';
+import { getContentQueue, withRetry, pathWithHomebrew } from '@wlu/shared';
 
-/** All supported platforms for publishing. */
+/** All supported platforms for publishing. Threads disabled — requires selfie verification. */
 const ALL_PLATFORMS = [
   'instagram', 'tiktok', 'youtube',
-  'reddit', 'pinterest', 'twitter', 'threads',
+  'reddit', 'pinterest', 'twitter',
 ] as const;
 
 /** Map platform → browser session directory for lock coordination. */
@@ -26,11 +24,10 @@ const SESSION_DIRS: Record<string, string> = {
   reddit: resolve(process.env.HOME ?? '.', '.wlu-reddit-session'),
   pinterest: resolve(process.env.HOME ?? '.', '.wlu-pinterest-session'),
   twitter: resolve(process.env.HOME ?? '.', '.wlu-twitter-session'),
-  threads: resolve(process.env.HOME ?? '.', '.wlu-threads-session'),
 };
 
 /** Platforms with outbound engagement modules. */
-const OUTBOUND_PLATFORMS = ['instagram', 'tiktok', 'youtube', 'reddit', 'twitter', 'threads'] as const;
+const OUTBOUND_PLATFORMS = ['instagram', 'tiktok', 'youtube', 'reddit', 'twitter'] as const;
 
 type Platform = (typeof ALL_PLATFORMS)[number];
 
@@ -141,11 +138,6 @@ async function runOutboundEngagement(options: { dryRun?: boolean }): Promise<voi
         await runTwitterOutboundSession({ dryRun });
         break;
       }
-      case 'threads': {
-        const { runThreadsOutboundSession } = await import('../engagement/outbound-threads.js');
-        await runThreadsOutboundSession({ dryRun });
-        break;
-      }
     }
   };
 
@@ -161,37 +153,6 @@ async function runOutboundEngagement(options: { dryRun?: boolean }): Promise<voi
 }
 
 /**
- * Remove stale SingletonLock symlinks from browser session directories.
- * Chromium creates these locks to prevent concurrent profile access. If a
- * browser process crashes or is killed, the lock file is left behind and
- * blocks all future launches until removed.
- */
-function cleanStaleLocks(): void {
-  for (const [platform, dir] of Object.entries(SESSION_DIRS)) {
-    const lockPath = resolve(dir, 'SingletonLock');
-    try {
-      const target = readlinkSync(lockPath);
-      // The lock is a symlink to "<hostname>-<pid>". Check if the PID is alive.
-      const pidMatch = target.match(/-(\d+)$/);
-      if (pidMatch) {
-        const pid = parseInt(pidMatch[1], 10);
-        try {
-          process.kill(pid, 0); // Signal 0 = check if alive
-          // Process is still alive — leave the lock
-          continue;
-        } catch {
-          // Process is dead — safe to remove
-        }
-      }
-      unlinkSync(lockPath);
-      console.log(`[scheduler] Removed stale lock: ${platform} (was ${target})`);
-    } catch {
-      // No lock file or not a symlink — nothing to clean
-    }
-  }
-}
-
-/**
  * Start the main scheduler loop. Runs all pipeline jobs on jittered intervals.
  * This is the long-running process started by `npm run schedule`.
  */
@@ -200,9 +161,10 @@ export async function startScheduler(options: SchedulerOptions = {}): Promise<vo
 
   installTimestampLogger();
 
-  // Clean up stale SingletonLock files left by crashed browser sessions.
-  // These prevent Playwright from launching new persistent contexts.
-  cleanStaleLocks();
+  // Clean up stale ProcessSingleton files left by crashed/orphaned browser
+  // sessions. These prevent Playwright from launching new persistent contexts.
+  // Cleans SingletonLock + SingletonCookie + SingletonSocket together.
+  await cleanStaleSingletons(Object.values(SESSION_DIRS));
 
   console.log('[scheduler] Starting social media engine...');
   console.log(`[scheduler] Platforms: ${platform ?? 'ALL (' + ALL_PLATFORMS.join(', ') + ')'}`);
@@ -214,12 +176,10 @@ export async function startScheduler(options: SchedulerOptions = {}): Promise<vo
   await printUpcomingSchedule();
 
   // Define all scheduled jobs
+  // NOTE: ingest job removed — render-next creates queue items directly with
+  // proper messageIds. The old ingest job scanned the output directory and
+  // created items with empty messageIds, breaking cross-post dedup.
   const jobs = [
-    {
-      name: 'ingest',
-      baseInterval: INTERVALS.INGEST,
-      fn: () => ingestNewVideos({ platform: platform ?? 'instagram', dryRun }),
-    },
     {
       name: 'caption',
       baseInterval: INTERVALS.CAPTION,
@@ -295,20 +255,47 @@ export async function startScheduler(options: SchedulerOptions = {}): Promise<vo
       fn: async () => {
         await seedDailyMessages({ dryRun });
         if (!dryRun) {
+          // Compute data-driven template weights from engagement metrics
+          try {
+            const { execFile } = await import('node:child_process');
+            const { promisify } = await import('node:util');
+            const exec = promisify(execFile);
+            const result = await exec('npx', ['tsx', 'packages/analytics/src/index.ts', 'learn-weights'], {
+              cwd: process.cwd(),
+              env: { ...process.env, PATH: pathWithHomebrew() },
+              timeout: 2 * 60 * 1000,
+            });
+            if (result.stdout) console.log(result.stdout.trim());
+            console.log('[scheduler] Template weights updated from engagement data');
+          } catch (err) {
+            console.warn('[scheduler] Weight learning failed:', err instanceof Error ? err.message : err);
+          }
+
+          // Strategy brief is optional — requires ANTHROPIC_API_KEY
           try {
             const { execFile } = await import('node:child_process');
             const { promisify } = await import('node:util');
             const exec = promisify(execFile);
             await exec('npx', ['tsx', 'packages/analytics/src/index.ts', 'strategy'], {
               cwd: process.cwd(),
-              env: { ...process.env, PATH: `/opt/homebrew/bin:${process.env.PATH}` },
+              env: { ...process.env, PATH: pathWithHomebrew() },
               timeout: 5 * 60 * 1000,
             });
             console.log('[scheduler] Strategy brief generated');
           } catch (err) {
-            // Strategy brief is optional — requires ANTHROPIC_API_KEY
             console.warn('[scheduler] Strategy brief skipped:', err instanceof Error ? err.message : err);
           }
+        }
+      },
+    },
+    {
+      name: 'collect-metrics',
+      baseInterval: INTERVALS.METRICS,
+      fn: async () => {
+        const { collectEngagementMetrics } = await import('../collectors/engagement.js');
+        const result = await collectEngagementMetrics();
+        if (result.captchaOn) {
+          console.warn(`[scheduler] Metrics collection hit CAPTCHA on ${result.captchaOn} — solve manually`);
         }
       },
     },
@@ -330,21 +317,13 @@ export async function startScheduler(options: SchedulerOptions = {}): Promise<vo
           const exec = promisify(execFile);
           const result = await exec('npx', ['tsx', 'packages/analytics/src/index.ts', 'daily-summary'], {
             cwd: process.cwd(),
-            env: { ...process.env, PATH: `/opt/homebrew/bin:${process.env.PATH}` },
+            env: { ...process.env, PATH: pathWithHomebrew() },
             timeout: 2 * 60 * 1000,
           });
           if (result.stdout) console.log(result.stdout);
         } catch (err) {
           console.warn('[scheduler] Daily summary failed:', err instanceof Error ? err.message : err);
         }
-      },
-    },
-    {
-      name: 'threads-text',
-      baseInterval: INTERVALS.THREADS_TEXT,
-      fn: async () => {
-        const { postStandaloneThread } = await import('../content/threads-standalone.js');
-        await withBrowserLock(SESSION_DIRS.threads, () => postStandaloneThread({ dryRun }));
       },
     },
     {

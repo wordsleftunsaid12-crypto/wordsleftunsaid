@@ -3,8 +3,10 @@ import { resolve, basename } from 'node:path';
 import { existsSync } from 'node:fs';
 import { createPost, getPostCountToday, updateContentQueueStatus } from '@wlu/shared';
 import { launchTikTok } from './browser.js';
+import { warmupBrowser } from '../warmup.js';
 
-const MAX_POSTS_PER_DAY = 3;
+// Reduced from 3 → 2 after TikTok started rate-limiting (Apr 2026).
+const MAX_POSTS_PER_DAY = 2;
 
 interface TikTokPublishResult {
   postId: string;
@@ -50,6 +52,9 @@ export async function browserPublishTikTok(options: {
   const { context, page } = await launchTikTok();
 
   try {
+    // Warm up: scroll FYP for 15-45s before starting upload
+    await warmupBrowser(page, { feedUrl: 'https://www.tiktok.com/foryou' });
+
     console.log('[tiktok-publish] Starting video upload...');
     const absoluteCoverPath = options.coverImagePath
       ? resolve(options.coverImagePath)
@@ -57,6 +62,24 @@ export async function browserPublishTikTok(options: {
     await uploadVideo(page, absoluteVideoPath, options.caption, absoluteCoverPath);
 
     console.log('[tiktok-publish] Video posted successfully!');
+
+    // Extract post URL from profile (newest video = first link)
+    let platformPostUrl: string | undefined;
+    try {
+      await page.goto('https://www.tiktok.com/@u.wordsleftunsaid', {
+        waitUntil: 'domcontentloaded',
+        timeout: 30000,
+      });
+      await page.waitForTimeout(5000);
+      const firstVideo = page.locator('a[href*="/video/"]').first();
+      const href = await firstVideo.getAttribute('href', { timeout: 5000 }).catch(() => null);
+      if (href) {
+        platformPostUrl = href.startsWith('http') ? href : `https://www.tiktok.com${href}`;
+        console.log(`[tiktok-publish] Extracted post URL: ${platformPostUrl}`);
+      }
+    } catch {
+      console.warn('[tiktok-publish] Could not extract post URL from profile');
+    }
 
     // Record in database
     const post = await createPost({
@@ -68,6 +91,7 @@ export async function browserPublishTikTok(options: {
       mood: options.mood,
       postType: 'reel',
       isExploration: options.isExploration,
+      platformPostUrl,
     });
 
     if (options.contentQueueId) {
@@ -126,52 +150,92 @@ async function uploadVideo(
   console.log('[tiktok-publish] Adding caption...');
   await enterCaption(page, caption);
 
-  // 6b. Set cover image if provided
+  // 6b. Set cover image if provided — wrapped in try-catch so cover failure never kills the publish
   if (coverImagePath && existsSync(coverImagePath)) {
-    console.log('[tiktok-publish] Setting cover image...');
-    await page.screenshot({ path: '/tmp/tiktok-before-cover.png' }).catch(() => {});
+    try {
+      console.log('[tiktok-publish] Setting cover image...');
+      await page.screenshot({ path: '/tmp/tiktok-before-cover.png' }).catch(() => {});
 
-    const editCover = page.locator('div[data-e2e="edit_video_cover"]')
-      .or(page.getByText('Edit cover', { exact: false }))
-      .or(page.locator('[class*="cover"]').filter({ hasText: /cover/i }))
-      .first();
-    const editCoverVisible = await editCover.isVisible({ timeout: 5000 }).catch(() => false);
-    console.log(`[tiktok-publish] "Edit cover" visible: ${editCoverVisible}`);
-
-    if (editCoverVisible) {
-      await editCover.click();
-      await page.waitForTimeout(2000);
-      await page.screenshot({ path: '/tmp/tiktok-cover-editor.png' }).catch(() => {});
-
-      // Look for upload button in the cover editor
-      const uploadCover = page.getByText('Upload cover', { exact: false })
-        .or(page.locator('button').filter({ hasText: /upload/i }))
+      const editCover = page.locator('div[data-e2e="edit_video_cover"]')
+        .or(page.getByText('Edit cover', { exact: false }))
+        .or(page.locator('[class*="cover"]').filter({ hasText: /cover/i }))
         .first();
-      const uploadVisible = await uploadCover.isVisible({ timeout: 5000 }).catch(() => false);
-      console.log(`[tiktok-publish] "Upload cover" visible: ${uploadVisible}`);
+      const editCoverVisible = await editCover.isVisible({ timeout: 5000 }).catch(() => false);
+      console.log(`[tiktok-publish] "Edit cover" visible: ${editCoverVisible}`);
 
-      if (uploadVisible) {
-        const [coverChooser] = await Promise.all([
-          page.waitForEvent('filechooser', { timeout: 10000 }),
-          uploadCover.click(),
-        ]);
-        await coverChooser.setFiles(coverImagePath);
-        console.log(`[tiktok-publish] Cover image set: ${basename(coverImagePath)}`);
-        await page.waitForTimeout(3000);
+      if (editCoverVisible) {
+        await editCover.click();
+        await page.waitForTimeout(2000);
+        await page.screenshot({ path: '/tmp/tiktok-cover-editor.png' }).catch(() => {});
 
-        // Confirm
-        const saveBtn = page.locator('button').filter({ hasText: /^(save|confirm|done)$/i }).first();
-        if (await saveBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-          await saveBtn.click();
+        // The cover editor has two tabs: "Select cover" (frame picker) and "Upload cover".
+        // Click the "Upload cover" tab to switch to the upload panel.
+        const uploadTab = page.getByText('Upload cover', { exact: true }).first();
+        const uploadTabVisible = await uploadTab.isVisible({ timeout: 3000 }).catch(() => false);
+        console.log(`[tiktok-publish] "Upload cover" tab visible: ${uploadTabVisible}`);
+
+        if (uploadTabVisible) {
+          await uploadTab.click();
           await page.waitForTimeout(2000);
+          await page.screenshot({ path: '/tmp/tiktok-cover-upload-tab.png' }).catch(() => {});
+
+          // In the Upload cover tab, look for file input or upload area
+          const fileInput = page.locator('input[type="file"]').last();
+          const fileInputExists = await fileInput.count() > 0;
+
+          if (fileInputExists) {
+            await fileInput.setInputFiles(coverImagePath);
+            console.log(`[tiktok-publish] Cover image set: ${basename(coverImagePath)}`);
+            await page.waitForTimeout(3000);
+          } else {
+            // Fallback: try clicking an upload button that triggers a file chooser
+            const uploadArea = page.getByText('Upload image', { exact: false })
+              .or(page.locator('[class*="upload"]').first())
+              .first();
+            if (await uploadArea.isVisible({ timeout: 3000 }).catch(() => false)) {
+              const [coverChooser] = await Promise.all([
+                page.waitForEvent('filechooser', { timeout: 10000 }),
+                uploadArea.click(),
+              ]);
+              await coverChooser.setFiles(coverImagePath);
+              console.log(`[tiktok-publish] Cover image set via chooser: ${basename(coverImagePath)}`);
+              await page.waitForTimeout(3000);
+            } else {
+              console.warn('[tiktok-publish] COVER UPLOAD FAILED: no file input found in Upload tab. Screenshot: /tmp/tiktok-cover-upload-tab.png');
+            }
+          }
+
+          // Click Confirm to save the cover — use JS click to bypass viewport restrictions
+          const confirmBtn = page.getByRole('button', { name: /^Confirm$/i }).first();
+          if (await confirmBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+            // Playwright's click fails with "outside of viewport" — use JS click directly
+            await confirmBtn.evaluate((el: HTMLElement) => el.click());
+            await page.waitForTimeout(2000);
+            console.log('[tiktok-publish] Cover confirmed');
+          } else {
+            // Try other save/done buttons
+            const saveBtn = page.locator('button').filter({ hasText: /^(save|done)$/i }).first();
+            if (await saveBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+              await saveBtn.evaluate((el: HTMLElement) => el.click());
+              await page.waitForTimeout(2000);
+            }
+          }
+        } else {
+          console.warn('[tiktok-publish] "Upload cover" tab not found — closing editor. Screenshot: /tmp/tiktok-cover-editor.png');
+          const closeBtn = page.locator('[aria-label="Close"], button:has(svg)').first();
+          if (await closeBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await closeBtn.click();
+          } else {
+            await page.keyboard.press('Escape');
+          }
+          await page.waitForTimeout(1000);
         }
-      } else {
-        console.warn('[tiktok-publish] COVER UPLOAD FAILED: "Upload cover" not found. Screenshot: /tmp/tiktok-cover-editor.png');
-        await page.keyboard.press('Escape');
-        await page.waitForTimeout(1000);
       }
-    } else {
-      console.warn('[tiktok-publish] COVER UPLOAD SKIPPED: "Edit cover" button not found. Screenshot: /tmp/tiktok-before-cover.png');
+    } catch (err) {
+      console.warn(`[tiktok-publish] Cover upload failed (non-fatal): ${err instanceof Error ? err.message : err}`);
+      // Try to close any lingering cover editor dialog
+      await page.keyboard.press('Escape').catch(() => {});
+      await page.waitForTimeout(1000);
     }
   }
 

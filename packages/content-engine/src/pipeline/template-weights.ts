@@ -1,10 +1,14 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import type { CompositionId } from './render.js';
 
 /**
  * Per-platform template weights for content experiments.
  *
- * Weights should sum to 1.0 per platform. Higher weight = more frequently selected.
- * Adjust based on engagement data from the analytics daily summary.
+ * These are the hardcoded defaults used when no learned weights are available.
+ * The learn-weights job computes data-driven weights from engagement metrics
+ * and writes them to ~/.wlu-learned-weights.json. When that file exists and
+ * is fresh (<48h), getTemplateWeights() uses learned weights instead.
  *
  * Active templates (Mar 2026):
  *   Cinematic — cinematic video with bg footage
@@ -25,7 +29,6 @@ interface PlatformWeights {
   reddit: TemplateWeight[];
   pinterest: TemplateWeight[];
   twitter: TemplateWeight[];
-  threads: TemplateWeight[];
 }
 
 const PLATFORM_WEIGHTS: PlatformWeights = {
@@ -76,35 +79,107 @@ const PLATFORM_WEIGHTS: PlatformWeights = {
     ['SplitScreenVertical', 0.23],
     ['CinematicVertical', 0.10],
   ],
-
-  // Threads: text-forward + video
-  threads: [
-    ['RawTextVertical', 0.38],
-    ['DeletedTextVertical', 0.27],
-    ['SplitScreenVertical', 0.19],
-    ['CinematicVertical', 0.16],
-  ],
 };
+
+// ---------------------------------------------------------------------------
+// Learned weights from engagement data (written by analytics learn-weights)
+// ---------------------------------------------------------------------------
+
+const LEARNED_WEIGHTS_FILE = resolve(process.env.HOME ?? '.', '.wlu-learned-weights.json');
+const MAX_AGE_MS = 48 * 3600 * 1000;
+const CACHE_TTL_MS = 5 * 60 * 1000;
+
+interface LearnedWeightsFile {
+  computedAt: string;
+  platforms: Record<string, Array<[string, number]>>;
+}
+
+let cachedWeights: LearnedWeightsFile | null | undefined;
+let cacheTimestamp = 0;
+/** Platforms we have already logged as using learned weights (per process). */
+const loggedPlatforms = new Set<string>();
+
+function loadLearnedWeights(): LearnedWeightsFile | null {
+  const now = Date.now();
+  if (cachedWeights !== undefined && now - cacheTimestamp < CACHE_TTL_MS) {
+    return cachedWeights;
+  }
+
+  try {
+    const raw = readFileSync(LEARNED_WEIGHTS_FILE, 'utf-8');
+    const parsed = JSON.parse(raw) as LearnedWeightsFile;
+    if (!parsed?.computedAt || !parsed?.platforms) {
+      cachedWeights = null;
+      cacheTimestamp = now;
+      return null;
+    }
+
+    const age = now - new Date(parsed.computedAt).getTime();
+    if (age > MAX_AGE_MS) {
+      cachedWeights = null;
+      cacheTimestamp = now;
+      return null;
+    }
+
+    cachedWeights = parsed;
+    cacheTimestamp = now;
+    return parsed;
+  } catch {
+    cachedWeights = null;
+    cacheTimestamp = now;
+    return null;
+  }
+}
 
 /**
  * Get template weights for a specific platform.
- * Falls back to Instagram weights for unknown platforms.
+ * Uses learned weights from engagement data when available,
+ * falls back to hardcoded defaults.
  */
 export function getTemplateWeights(platform: string): TemplateWeight[] {
+  const learned = loadLearnedWeights();
+  if (learned?.platforms[platform]) {
+    const weights = learned.platforms[platform];
+    // Validate structure before using
+    if (
+      weights.length > 0 &&
+      weights.every(([t, w]) => typeof t === 'string' && typeof w === 'number' && w > 0)
+    ) {
+      if (!loggedPlatforms.has(platform)) {
+        console.log(`[template-weights] Using learned weights for ${platform}`);
+        loggedPlatforms.add(platform);
+      }
+      return weights as TemplateWeight[];
+    }
+  }
+
   return PLATFORM_WEIGHTS[platform as keyof PlatformWeights] ?? PLATFORM_WEIGHTS.instagram;
 }
 
 /**
  * Pick a template using weighted random selection.
+ * @param exclude — template names to exclude (e.g. recently used).
+ *   Their weight is redistributed proportionally to the remaining templates.
+ *   If all templates are excluded, the exclusion list is ignored.
  */
-export function pickWeightedTemplate(weights: TemplateWeight[]): CompositionId {
-  const r = Math.random();
+export function pickWeightedTemplate(
+  weights: TemplateWeight[],
+  exclude?: Set<CompositionId>,
+): CompositionId {
+  let filtered = weights;
+  if (exclude && exclude.size > 0) {
+    const remaining = weights.filter(([name]) => !exclude.has(name));
+    if (remaining.length > 0) filtered = remaining;
+  }
+
+  const total = filtered.reduce((s, [, w]) => s + w, 0);
+  const r = Math.random() * total;
   let cumulative = 0;
-  for (const [name, weight] of weights) {
+  for (const [name, weight] of filtered) {
     cumulative += weight;
     if (r < cumulative) return name;
   }
-  return weights[0][0];
+  return filtered[0][0];
 }
 
 /**
@@ -120,4 +195,12 @@ export function getAllTemplates(): CompositionId[] {
     'HandwritingSVGVertical',
     'RawTextVertical',
   ];
+}
+
+/**
+ * Get the hardcoded default weights for all platforms.
+ * Used by the learn-weights job as the baseline for Bayesian smoothing.
+ */
+export function getDefaultWeights(): Record<string, Array<[string, number]>> {
+  return { ...PLATFORM_WEIGHTS };
 }

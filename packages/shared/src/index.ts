@@ -52,6 +52,8 @@ export {
   updateContentQueueStatus,
   getNextScheduledItem,
   getContentQueueItemByVideoPath,
+  hasQueueItemForVideo,
+  hasAnyQueueItemForVideo,
   getUsedMessageIds,
   getOverdueItems,
 } from './db/content-queue.js';
@@ -84,6 +86,8 @@ export {
   getTodayPosts,
   getUnverifiedPosts,
   updatePostVerification,
+  updatePostUrl,
+  getPostsNeedingMetrics,
 } from './db/posts.js';
 
 // Utils
@@ -93,6 +97,7 @@ export { sanitizeText, sanitizeMessageInput } from './utils/sanitize.js';
 export { moderateContent } from './utils/moderate.js';
 export type { ModerationResult } from './utils/moderate.js';
 export { notifyMessageApproved, notifyFirstLike, notifyMessageBecameVideo } from './utils/notify.js';
+export { homebrewBin, pathWithHomebrew } from './utils/paths.js';
 
 // Config
 export { getEnv, getEnvSafe } from './config/env.js';

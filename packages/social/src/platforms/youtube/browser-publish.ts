@@ -3,8 +3,11 @@ import { resolve, basename } from 'node:path';
 import { existsSync } from 'node:fs';
 import { createPost, getPostCountToday, updateContentQueueStatus } from '@wlu/shared';
 import { launchYouTube } from './browser.js';
+import { assertNoCaptcha, CaptchaDetectedError } from '../../utils/captcha.js';
+import { warmupBrowser } from '../warmup.js';
 
-const MAX_POSTS_PER_DAY = 3;
+// Reduced from 3 → 2 (Apr 2026) — YouTube is more tolerant but consistency matters.
+const MAX_POSTS_PER_DAY = 2;
 
 interface YouTubePublishResult {
   postId: string;
@@ -50,11 +53,14 @@ export async function browserPublishYouTubeShort(options: {
   const { context, page } = await launchYouTube();
 
   try {
+    // Warm up: browse YouTube before opening Studio upload
+    await warmupBrowser(page, { feedUrl: 'https://www.youtube.com/' });
+
     console.log('[youtube-publish] Starting video upload...');
     const absoluteCoverPath = options.coverImagePath
       ? resolve(options.coverImagePath)
       : undefined;
-    await uploadShort(page, absoluteVideoPath, options.caption, absoluteCoverPath);
+    const platformPostUrl = await uploadShort(page, absoluteVideoPath, options.caption, absoluteCoverPath);
 
     console.log('[youtube-publish] Video posted successfully!');
 
@@ -68,18 +74,25 @@ export async function browserPublishYouTubeShort(options: {
       mood: options.mood,
       postType: 'reel',
       isExploration: options.isExploration,
+      platformPostUrl,
     });
 
     if (options.contentQueueId) {
       await updateContentQueueStatus(options.contentQueueId, 'posted');
     }
 
+    await context.close();
     return {
       postId: post.id,
       platformPostId: null,
     };
-  } finally {
+  } catch (err) {
+    // Leave browser open on CAPTCHA so user can solve manually
+    if (err instanceof CaptchaDetectedError) {
+      throw err;
+    }
     await context.close();
+    throw err;
   }
 }
 
@@ -91,23 +104,68 @@ async function uploadShort(
   videoPath: string,
   caption: string,
   coverImagePath?: string,
-): Promise<void> {
-  // 1. Navigate to YouTube Studio
+): Promise<string | undefined> {
+  // 1. launchYouTube() already navigated to Studio and verified login.
+  //    Just ensure we're on the Studio page (may have been redirected by modals).
   console.log('[youtube-publish] Navigating to YouTube Studio...');
-  await page.goto('https://studio.youtube.com', {
-    waitUntil: 'domcontentloaded',
-    timeout: 30000,
-  });
-  await page.waitForTimeout(5000);
+  if (!page.url().includes('studio.youtube.com')) {
+    await page.goto('https://studio.youtube.com', {
+      waitUntil: 'domcontentloaded',
+      timeout: 30000,
+    });
+    await page.waitForTimeout(5000);
+  }
 
-  // 2. Click Create → Upload videos
+  // Check for verification popups before proceeding
+  await assertNoCaptcha(page, 'youtube');
+  await page.screenshot({ path: '/tmp/youtube-before-create.png' }).catch(() => {});
+
+  // 2. Click Create → Upload videos (multiple selector strategies)
   console.log('[youtube-publish] Clicking Create...');
-  const createBtn = page.locator('#create-icon, [aria-label="Create"]').first();
-  await createBtn.click({ timeout: 10000 });
+  // YouTube Studio redesigns the Create button periodically — try multiple strategies
+  const createStrategies = [
+    () => page.getByRole('button', { name: /Create/i }).first(),
+    () => page.locator('#create-icon').first(),
+    () => page.locator('[aria-label="Create"]').first(),
+    () => page.locator('ytcp-button#create-icon').first(),
+    () => page.locator('[aria-label="Upload"]').first(),
+    () => page.locator('[aria-label="Upload videos"]').first(),
+  ];
+
+  let createClicked = false;
+  for (const getBtn of createStrategies) {
+    const btn = getBtn();
+    if (await btn.isVisible({ timeout: 3000 }).catch(() => false)) {
+      console.log('[youtube-publish] Found Create button, clicking...');
+      await btn.click({ timeout: 10000 });
+      createClicked = true;
+      break;
+    }
+  }
+
+  if (!createClicked) {
+    await page.screenshot({ path: '/tmp/youtube-create-not-found.png' }).catch(() => {});
+    throw new Error(
+      'YouTube Create button not found — UI may have changed. Screenshot: /tmp/youtube-create-not-found.png',
+    );
+  }
+
   await page.waitForTimeout(2000);
 
   const uploadOption = page.getByRole('menuitem', { name: 'Upload videos' }).first();
-  await uploadOption.click({ timeout: 10000 });
+  if (await uploadOption.isVisible({ timeout: 5000 }).catch(() => false)) {
+    await uploadOption.click({ timeout: 10000 });
+  } else {
+    // Some Create button variants go directly to upload — check if file input appeared
+    const fileInputReady = await page.locator('input[type="file"]').first().isVisible({ timeout: 3000 }).catch(() => false);
+    if (!fileInputReady) {
+      await page.screenshot({ path: '/tmp/youtube-upload-menu-not-found.png' }).catch(() => {});
+      throw new Error(
+        'YouTube Upload menu item not found. Screenshot: /tmp/youtube-upload-menu-not-found.png',
+      );
+    }
+    console.log('[youtube-publish] Upload input appeared directly (no menu needed)');
+  }
   await page.waitForTimeout(3000);
 
   // 3. Upload file via file input
@@ -193,9 +251,9 @@ async function uploadShort(
   const saveBtn = page.locator('#done-button').first();
   await saveBtn.click({ timeout: 10000 });
 
-  // 13. Wait for confirmation
+  // 13. Wait for confirmation and extract video URL
   console.log('[youtube-publish] Waiting for confirmation...');
-  await waitForConfirmation(page);
+  return await waitForConfirmation(page);
 }
 
 /**
@@ -292,8 +350,9 @@ async function clickNext(page: Page): Promise<void> {
 
 /**
  * Wait for YouTube to confirm the upload is complete.
+ * Returns the video URL if found in the confirmation dialog.
  */
-async function waitForConfirmation(page: Page): Promise<void> {
+async function waitForConfirmation(page: Page): Promise<string | undefined> {
   // Wait for confirmation — this MUST succeed for the post to be recorded
   try {
     // YouTube shows "Video published" or a link to the video
@@ -313,6 +372,25 @@ async function waitForConfirmation(page: Page): Promise<void> {
     );
   }
 
+  // Try to extract the video URL from the confirmation dialog
+  let videoUrl: string | undefined;
+  try {
+    const shortsLink = page.locator('a[href*="youtube.com/shorts"]').first();
+    const youtubeLink = page.locator('a[href*="youtu.be"]').first();
+
+    if (await shortsLink.isVisible({ timeout: 2000 }).catch(() => false)) {
+      videoUrl = await shortsLink.getAttribute('href') ?? undefined;
+    } else if (await youtubeLink.isVisible({ timeout: 2000 }).catch(() => false)) {
+      videoUrl = await youtubeLink.getAttribute('href') ?? undefined;
+    }
+
+    if (videoUrl) {
+      console.log(`[youtube-publish] Video URL: ${videoUrl}`);
+    }
+  } catch {
+    // URL extraction is best-effort
+  }
+
   // Close the upload dialog if there's a close button
   try {
     const closeBtn = page.locator('#close-button, [aria-label="Close"]').first();
@@ -323,4 +401,6 @@ async function waitForConfirmation(page: Page): Promise<void> {
   } catch {
     // No close button
   }
+
+  return videoUrl;
 }

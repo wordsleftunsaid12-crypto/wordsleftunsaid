@@ -102,6 +102,7 @@ export async function createPost(input: {
   platform: Platform;
   platformPostId?: string;
   platformMediaUrl?: string;
+  platformPostUrl?: string;
   contentQueueId?: string;
   messageIds: string[];
   caption?: string;
@@ -119,6 +120,7 @@ export async function createPost(input: {
       platform: input.platform,
       platform_post_id: input.platformPostId ?? null,
       platform_media_url: input.platformMediaUrl ?? null,
+      platform_post_url: input.platformPostUrl ?? null,
       content_queue_id: input.contentQueueId ?? null,
       message_ids: input.messageIds,
       caption: input.caption ?? null,
@@ -154,19 +156,39 @@ export async function getPostsByPlatform(
 }
 
 export async function getRecentPosts(
-  daysBack: number = 7,
-  filters: { limit?: number } = {},
+  platformOrDays?: string | number,
+  daysBackOrFilters?: number | { limit?: number },
 ): Promise<Post[]> {
-  const { limit = DEFAULT_PAGE_SIZE } = filters;
+  // Overload: getRecentPosts(platform, daysBack) or getRecentPosts(daysBack, {limit})
+  let platform: string | undefined;
+  let daysBack = 7;
+  let limit = DEFAULT_PAGE_SIZE;
+
+  if (typeof platformOrDays === 'string') {
+    platform = platformOrDays;
+    daysBack = typeof daysBackOrFilters === 'number' ? daysBackOrFilters : 7;
+  } else if (typeof platformOrDays === 'number') {
+    daysBack = platformOrDays;
+    if (typeof daysBackOrFilters === 'object' && daysBackOrFilters !== null) {
+      limit = daysBackOrFilters.limit ?? DEFAULT_PAGE_SIZE;
+    }
+  }
+
   const client = getServiceClient();
   const since = new Date(Date.now() - daysBack * 86400000).toISOString();
 
-  const { data, error } = await client
+  let query = client
     .from('posts')
     .select('*')
     .gte('posted_at', since)
     .order('posted_at', { ascending: false })
     .limit(limit);
+
+  if (platform) {
+    query = query.eq('platform', platform);
+  }
+
+  const { data, error } = await query;
 
   if (error) throw new Error(`Failed to fetch recent posts: ${error.message}`);
   return (data as Row[]).map(mapPost);
@@ -432,6 +454,73 @@ export async function getAllMetricsForPost(
 
   if (error) throw new Error(`Failed to fetch metrics: ${error.message}`);
   return (data as Row[]).map(mapMetric);
+}
+
+/**
+ * Update a post's platform URL.
+ */
+export async function updatePostUrl(
+  id: string,
+  platformPostUrl: string,
+): Promise<Post> {
+  const client = getServiceClient();
+
+  const { data, error } = await client
+    .from('posts')
+    .update({ platform_post_url: platformPostUrl })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) throw new Error(`Failed to update post URL: ${error.message}`);
+  return mapPost(data as Row);
+}
+
+/**
+ * Get posts that need fresh engagement metrics.
+ * Returns posts where the latest metric is older than `maxAgeHours` or has no metrics at all.
+ */
+export async function getPostsNeedingMetrics(
+  platform: Platform,
+  maxAgeHours: number = 6,
+  limit: number = 10,
+): Promise<Post[]> {
+  const client = getServiceClient();
+
+  // Get recent posts for the platform (with or without URL — URL discovery happens in scraper)
+  const { data: posts, error } = await client
+    .from('posts')
+    .select('*')
+    .eq('platform', platform)
+    .order('posted_at', { ascending: false })
+    .limit(limit * 2); // Fetch extra since we'll filter by metrics freshness
+
+  if (error) throw new Error(`Failed to fetch posts needing metrics: ${error.message}`);
+  if (!posts || posts.length === 0) return [];
+
+  const cutoff = new Date(Date.now() - maxAgeHours * 3600000).toISOString();
+  const result: Post[] = [];
+
+  for (const post of posts) {
+    if (result.length >= limit) break;
+
+    // Check if this post has fresh metrics
+    const { data: metrics } = await client
+      .from('engagement_metrics')
+      .select('measured_at')
+      .eq('post_id', (post as Row).id)
+      .order('measured_at', { ascending: false })
+      .limit(1);
+
+    const hasRecentMetrics = metrics && metrics.length > 0 &&
+      (metrics[0].measured_at as string) > cutoff;
+
+    if (!hasRecentMetrics) {
+      result.push(mapPost(post as Row));
+    }
+  }
+
+  return result;
 }
 
 // --- Comment Tracking ---

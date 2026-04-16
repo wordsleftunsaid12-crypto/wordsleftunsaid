@@ -2,9 +2,12 @@ import type { Page } from 'playwright';
 import { resolve, basename } from 'node:path';
 import { existsSync } from 'node:fs';
 import { createPost, getPostCountToday, updateContentQueueStatus } from '@wlu/shared';
-import { launchInstagram, BROWSER_DATA_DIR } from './browser.js';
+import { launchInstagram, BROWSER_DATA_DIR, navigateToProfile } from './browser.js';
+import { warmupBrowser } from '../warmup.js';
 
-const MAX_POSTS_PER_DAY = 3;
+// Reduced from 3 → 2 after IG flagged the account (Apr 2026).
+// Two posts per day is within IG's "safe" organic posting cadence.
+const MAX_POSTS_PER_DAY = 2;
 
 interface BrowserPublishResult {
   postId: string;
@@ -50,6 +53,8 @@ export async function browserPublishReel(options: {
   const { context, page } = await launchInstagram();
 
   try {
+    // Warm up: scroll the feed for 15-45s to look human before posting
+    await warmupBrowser(page, { feedUrl: 'https://www.instagram.com/' });
 
     // Create the Reel
     console.log('[browser-publish] Starting Reel creation...');
@@ -59,6 +64,21 @@ export async function browserPublishReel(options: {
     await createReelPost(page, absoluteVideoPath, options.caption, absoluteCoverPath);
 
     console.log('[browser-publish] Reel posted successfully!');
+
+    // Extract the post URL from the profile (newest post = first link)
+    let platformPostUrl: string | undefined;
+    try {
+      await navigateToProfile(page, 'u.wordsleftunsent');
+      await page.waitForTimeout(3000);
+      const firstPost = page.locator('a[href*="/reel/"], a[href*="/p/"]').first();
+      const href = await firstPost.getAttribute('href', { timeout: 5000 }).catch(() => null);
+      if (href) {
+        platformPostUrl = href.startsWith('http') ? href : `https://www.instagram.com${href}`;
+        console.log(`[browser-publish] Extracted post URL: ${platformPostUrl}`);
+      }
+    } catch {
+      console.warn('[browser-publish] Could not extract post URL from profile');
+    }
 
     // Record in database
     const post = await createPost({
@@ -70,6 +90,7 @@ export async function browserPublishReel(options: {
       mood: options.mood,
       postType: 'reel',
       isExploration: options.isExploration,
+      platformPostUrl,
     });
 
     if (options.contentQueueId) {
@@ -176,8 +197,9 @@ async function createReelPost(
     await page.screenshot({ path: '/tmp/ig-before-cover.png' }).catch(() => {});
 
     const editCover = page.getByText('Edit cover', { exact: false }).first();
-    const editCoverVisible = await editCover.isVisible({ timeout: 5000 }).catch(() => false);
-    console.log(`[browser-publish] "Edit cover" visible: ${editCoverVisible}`);
+    // Instagram desktop web often hides "Edit cover" on the caption step —
+    // it's primarily a mobile feature. Short timeout to not slow down the flow.
+    const editCoverVisible = await editCover.isVisible({ timeout: 3000 }).catch(() => false);
 
     if (editCoverVisible) {
       await editCover.click();
@@ -215,7 +237,7 @@ async function createReelPost(
         await page.waitForTimeout(1000);
       }
     } else {
-      console.warn('[browser-publish] COVER UPLOAD SKIPPED: "Edit cover" button not found. Screenshot: /tmp/ig-before-cover.png');
+      console.log('[browser-publish] "Edit cover" not available in desktop web flow — using auto-selected cover');
     }
   }
 

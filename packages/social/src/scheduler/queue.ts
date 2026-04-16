@@ -8,14 +8,13 @@ import {
 import type { StrategyBrief, Platform } from '@wlu/shared';
 
 /** Per-platform default posting hours in Pacific Time (America/Los_Angeles). */
-const PLATFORM_DEFAULTS: Record<Platform, number[]> = {
+const PLATFORM_DEFAULTS: Partial<Record<Platform, number[]>> = {
   instagram: [7, 12, 17],
   tiktok: [10, 14, 19],
   youtube: [14, 17],
   reddit: [8, 18],
   pinterest: [20, 21],
   twitter: [8, 12, 17],
-  threads: [7, 9, 12, 15, 19, 21],
 };
 
 /** Default timezone when no config exists. */
@@ -100,22 +99,29 @@ export async function scheduleCaptionedItems(
 /**
  * Get the next N available posting time slots (in UTC).
  * Distributes posts across preferred hours with no more than 1 post per slot.
+ * If `startFrom` is provided, no slot will be earlier than that time —
+ * used by cross-posting to space out platform queues.
  */
-function computeNextSlots(preferredHoursUtc: number[], count: number): Date[] {
+function computeNextSlots(
+  preferredHoursUtc: number[],
+  count: number,
+  startFrom?: Date,
+): Date[] {
   const slots: Date[] = [];
   const now = new Date();
+  const floor = startFrom && startFrom > now ? startFrom : now;
 
-  // Start from the current hour (floored)
-  const currentDate = new Date(now);
+  // Start from the floor hour (floored to hour boundary)
+  const currentDate = new Date(floor);
   currentDate.setUTCMinutes(0, 0, 0);
 
   // If we're past the halfway mark of this hour, skip to next
-  if (now.getUTCMinutes() > 30) {
+  if (floor.getUTCMinutes() > 30) {
     currentDate.setUTCHours(currentDate.getUTCHours() + 1);
   }
 
   // Look ahead up to 7 days for available slots
-  const maxDate = new Date(now.getTime() + 7 * 86400000);
+  const maxDate = new Date(floor.getTime() + 7 * 86400000);
 
   while (slots.length < count && currentDate < maxDate) {
     const hour = currentDate.getUTCHours();
@@ -125,8 +131,8 @@ function computeNextSlots(preferredHoursUtc: number[], count: number): Date[] {
       const jitterMs = (Math.random() - 0.5) * 30 * 60000;
       const slot = new Date(currentDate.getTime() + jitterMs);
 
-      // Only schedule in the future
-      if (slot > now) {
+      // Only schedule after the floor
+      if (slot > floor) {
         slots.push(slot);
       }
     }
@@ -179,15 +185,21 @@ async function getPreferredPostingHours(
 /**
  * Get the next available posting slot for a platform.
  * Used by cross-posting to schedule at a proper preferred hour
- * instead of immediately.
+ * instead of immediately. If `startFrom` is provided, the slot will
+ * be at or after that time — pass the previous cross-post time to
+ * spread posts across hours instead of clustering.
  */
-export async function getNextSlotForPlatform(platform: Platform): Promise<Date> {
+export async function getNextSlotForPlatform(
+  platform: Platform,
+  startFrom?: Date,
+): Promise<Date> {
   const preferredHours = await getPreferredPostingHours(platform);
-  const slots = computeNextSlots(preferredHours, 1);
+  const slots = computeNextSlots(preferredHours, 1, startFrom);
   if (slots.length > 0) return slots[0];
 
-  // Fallback: 2 hours from now if no preferred slots found
-  return new Date(Date.now() + 2 * 3600000);
+  // Fallback: 2 hours after the floor if no preferred slots found
+  const base = startFrom && startFrom > new Date() ? startFrom : new Date();
+  return new Date(base.getTime() + 2 * 3600000);
 }
 
 /**

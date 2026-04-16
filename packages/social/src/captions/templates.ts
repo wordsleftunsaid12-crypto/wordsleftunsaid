@@ -189,24 +189,81 @@ export function pickCaptionTemplate(mood: MessageMood): string {
   return `${hook}\n\n${body}\n\n${question}\n\n${cta}`;
 }
 
-/** Platform-specific hashtag sets */
-const HASHTAG_SETS: Record<'instagram' | 'tiktok' | 'youtube', string[]> = {
-  instagram: [
-    '#wordsleftunsent', '#unsentletters', '#unsentwords', '#anonymousmessage',
-    '#thingsineversent', '#deepfeelings', '#emotionalhealing', '#vulnerability',
-    '#selflove', '#mentalhealthawareness', '#relatablequotes', '#heartbreak',
-    '#healing', '#lettertoself', '#writingcommunity',
-  ],
-  tiktok: [
-    '#wordsleftunsent', '#fyp', '#relatable', '#emotional', '#unsentletters',
-    '#deepquotes', '#mentalhealthawareness', '#heartbreak', '#healing',
-    '#vulnerability', '#viral', '#foryou',
-  ],
-  youtube: [
-    '#wordsleftunsent', '#shorts', '#unsentletters', '#emotional',
-    '#relatable', '#deepquotes', '#anonymous', '#healing',
-  ],
+/**
+ * Platform-specific hashtag POOLS.
+ *
+ * Every post picks a random subset of 8-12 tags from the pool instead of
+ * reusing the exact same set every time. Identical hashtag strings across
+ * posts are a primary bot-detection signal.
+ *
+ * The "anchor" tags (first element) are always included so the brand
+ * still ties content together across posts — the rest rotate.
+ */
+const HASHTAG_POOLS: Record<'instagram' | 'tiktok' | 'youtube', {
+  anchor: string;
+  pool: string[];
+}> = {
+  instagram: {
+    anchor: '#wordsleftunsent',
+    pool: [
+      '#unsentletters', '#unsentwords', '#anonymousmessage', '#thingsineversent',
+      '#deepfeelings', '#emotionalhealing', '#vulnerability', '#selflove',
+      '#mentalhealthawareness', '#relatablequotes', '#heartbreak', '#healing',
+      '#lettertoself', '#writingcommunity', '#poetrycommunity', '#writersofig',
+      '#spilledink', '#lateletters', '#emotionaldamage', '#softgirlera',
+      '#silentthoughts', '#quotestagram', '#relatablepoetry', '#grief',
+    ],
+  },
+  tiktok: {
+    anchor: '#wordsleftunsent',
+    pool: [
+      '#fyp', '#foryou', '#foryoupage', '#relatable', '#emotional',
+      '#unsentletters', '#deepquotes', '#mentalhealthawareness', '#heartbreak',
+      '#healing', '#vulnerability', '#breakuptok', '#situationship',
+      '#softgirlera', '#sadtok', '#grief', '#emotionaldamage',
+      '#latenightthoughts', '#writertok', '#xyzbca',
+    ],
+  },
+  youtube: {
+    anchor: '#wordsleftunsent',
+    pool: [
+      '#shorts', '#unsentletters', '#emotional', '#relatable', '#deepquotes',
+      '#anonymous', '#healing', '#heartbreak', '#poetry', '#grief',
+      '#shortsvideo', '#ytshorts', '#writingprompts', '#softquotes',
+    ],
+  },
 };
+
+/**
+ * Pick a random subset of n items from an array using Fisher-Yates.
+ */
+function pickRandomSubset<T>(items: readonly T[], n: number): T[] {
+  const clone = [...items];
+  for (let i = clone.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [clone[i], clone[j]] = [clone[j], clone[i]];
+  }
+  return clone.slice(0, n);
+}
+
+/**
+ * Build a rotated hashtag list for a platform. Always includes the brand
+ * anchor; the rest are drawn randomly from the pool so each post has a
+ * slightly different tag mix.
+ */
+function buildHashtags(platform: 'instagram' | 'tiktok' | 'youtube'): string[] {
+  const { anchor, pool } = HASHTAG_POOLS[platform];
+  // IG allows up to 30 but 8-12 is optimal; TikTok 5-8; YouTube 5-10.
+  const counts: Record<typeof platform, [number, number]> = {
+    instagram: [8, 12],
+    tiktok: [5, 8],
+    youtube: [5, 8],
+  };
+  const [minCount, maxCount] = counts[platform];
+  const target = minCount + Math.floor(Math.random() * (maxCount - minCount + 1));
+  const picked = pickRandomSubset(pool, target - 1); // -1 for anchor
+  return [anchor, ...picked];
+}
 
 /** TikTok-specific trending hooks to prepend to captions */
 const TIKTOK_HOOKS = [
@@ -232,6 +289,6 @@ export function buildCaption(
     caption = `${hook}\n\n${caption}`;
   }
 
-  const hashtags = HASHTAG_SETS[platform];
+  const hashtags = buildHashtags(platform);
   return { caption, hashtags };
 }

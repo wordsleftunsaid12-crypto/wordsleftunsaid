@@ -5,6 +5,7 @@
 import { chromium, type BrowserContext, type Page } from 'playwright';
 import { resolve } from 'node:path';
 import { existsSync, mkdirSync } from 'node:fs';
+import { assertNoCaptcha } from '../../utils/captcha.js';
 
 /** Persistent browser profile — stays logged in across sessions */
 export const YOUTUBE_BROWSER_DATA_DIR = resolve(
@@ -58,6 +59,9 @@ export async function launchYouTube(): Promise<BrowserSession> {
         '  npx tsx packages/social/src/platforms/youtube/browser.ts',
     );
   }
+
+  // Check for verification/CAPTCHA popups (leaves browser open if detected)
+  await assertNoCaptcha(page, 'youtube');
 
   return { context, page };
 }

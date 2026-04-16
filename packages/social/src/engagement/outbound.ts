@@ -6,6 +6,7 @@ import {
 import { getTargetHashtags, pickRandomHashtag } from './targeting.js';
 import { jitteredSleep } from '../scheduler/timing.js';
 import { launchInstagram, navigateToHashtag } from '../platforms/instagram/browser.js';
+import { quickWarmup } from '../platforms/warmup.js';
 
 /**
  * Strict daily limits for outbound engagement.
@@ -103,6 +104,10 @@ export async function runOutboundSession(
   const { context, page } = await launchInstagram();
   const result: OutboundResult = { likes: 0, follows: 0, comments: 0, commentLikes: 0, errors: 0 };
   const visitedUrls = new Set<string>();
+
+  // Quick warmup before starting engagement rounds — 5-12s of feed browsing.
+  // Bots open → interact immediately; humans pause to look at things first.
+  await quickWarmup(page);
 
   try {
     console.log(`[outbound] Navigating to #${targetHashtag}...`);

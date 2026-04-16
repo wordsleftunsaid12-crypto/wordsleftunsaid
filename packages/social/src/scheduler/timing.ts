@@ -21,19 +21,21 @@ export function jitteredSleep(baseMs: number): Promise<void> {
 
 /**
  * Predefined base intervals for scheduled jobs (in milliseconds).
+ *
+ * NOTE (Apr 2026): all posting-related intervals were stretched after
+ * Instagram/TikTok flagged the account as bot activity. The goal is
+ * to keep total daily actions well under platform thresholds.
  */
 export const INTERVALS = {
-  INGEST: 30 * 60000,         // 30 min base → 21-39 min with jitter
-  CAPTION: 15 * 60000,        // 15 min base → 10-20 min
-  SCHEDULE: 60 * 60000,       // 60 min base → 42-78 min
-  PUBLISH: 5 * 60000,         // 5 min base → 3.5-6.5 min
-  COMMENT_REPLY: 6 * 3600000, // 6 hours base → ~4x/day (low engagement phase)
-  OUTBOUND: 6 * 3600000,      // 6 hours base → ~4x/day (reduced after IG flagging)
-  RENDER: 4 * 3600000,        // 4 hours base → 2.8-5.2 hours with jitter
-  METRICS: 12 * 3600000,      // 12 hours base → twice daily with jitter
-  LEARN: 24 * 3600000,        // 24 hours (once daily)
-  VERIFY: 4 * 3600000,        // 4 hours base → ~6x/day (low engagement phase)
+  CAPTION: 15 * 60000,         // 15 min base → 10-20 min
+  SCHEDULE: 60 * 60000,        // 60 min base → 42-78 min
+  PUBLISH: 15 * 60000,         // 15 min base → 10-20 min (was 5m — too eager)
+  COMMENT_REPLY: 8 * 3600000,  // 8 hours base → ~3x/day
+  OUTBOUND: 12 * 3600000,      // 12 hours base → ~2x/day (further reduced)
+  RENDER: 6 * 3600000,         // 6 hours base → ~4x/day (was 4h)
+  METRICS: 12 * 3600000,       // 12 hours base → ~2x daily
+  LEARN: 24 * 3600000,         // 24 hours (once daily)
+  VERIFY: 6 * 3600000,         // 6 hours base → ~4x/day (was 4h)
   DAILY_SUMMARY: 24 * 3600000, // 24 hours (once daily)
   UNFOLLOW: 24 * 3600000,      // 24 hours (once daily)
-  THREADS_TEXT: 4 * 3600000,   // 4 hours → ~6 standalone text threads/day
 } as const;

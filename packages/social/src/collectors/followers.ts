@@ -10,7 +10,6 @@ import { launchTikTok, navigateToProfile as navigateToTkProfile } from '../platf
 import { launchYouTube } from '../platforms/youtube/browser.js';
 import { launchTwitter } from '../platforms/twitter/browser.js';
 import { launchReddit } from '../platforms/reddit/browser.js';
-import { launchThreads } from '../platforms/threads/browser.js';
 import { launchPinterest } from '../platforms/pinterest/browser.js';
 
 interface FollowerCounts {
@@ -280,38 +279,6 @@ async function extractRedditCounts(page: Page): Promise<FollowerCounts> {
   return { followers, following: 0 };
 }
 
-// --- Threads ---
-
-export async function scrapeThreadsFollowerCounts(
-  username = 'u.wordsleftunsent',
-): Promise<FollowerCounts> {
-  const { context, page } = await launchThreads();
-  try {
-    await page.goto(`https://www.threads.net/@${username}`, {
-      waitUntil: 'domcontentloaded',
-      timeout: 30000,
-    });
-    await page.waitForTimeout(3000);
-    return await extractThreadsCounts(page);
-  } finally {
-    await context.close();
-  }
-}
-
-async function extractThreadsCounts(page: Page): Promise<FollowerCounts> {
-  let followers = 0;
-
-  // Threads profile shows "N followers" as a link/text
-  const bodyText = await page.locator('main, header').allInnerTexts()
-    .then(texts => texts.join(' '))
-    .catch(() => '');
-  const fMatch = bodyText.match(/([\d,.]+[KMB]?)\s*followers?/i);
-  if (fMatch) followers = parseAbbreviatedCount(fMatch[1]);
-
-  console.log(`[followers] Threads: ${followers} followers`);
-  return { followers, following: 0 };
-}
-
 // --- Pinterest ---
 
 export async function scrapePinterestFollowerCounts(
@@ -349,13 +316,12 @@ async function extractPinterestCounts(page: Page): Promise<FollowerCounts> {
 
 // --- Per-platform scraper map (exported for scheduler lock integration) ---
 
-const SCRAPER_MAP: Record<Platform, () => Promise<FollowerCounts>> = {
+const SCRAPER_MAP: Partial<Record<Platform, () => Promise<FollowerCounts>>> = {
   instagram: scrapeInstagramFollowerCounts,
   tiktok: scrapeTikTokFollowerCounts,
   youtube: scrapeYouTubeSubscriberCount,
   twitter: scrapeTwitterFollowerCounts,
   reddit: scrapeRedditFollowerCounts,
-  threads: scrapeThreadsFollowerCounts,
   pinterest: scrapePinterestFollowerCounts,
 };
 
@@ -397,7 +363,6 @@ export async function collectAllFollowerSnapshots(): Promise<CollectionResult> {
     { platform: 'youtube', fn: scrapeYouTubeSubscriberCount },
     { platform: 'twitter', fn: scrapeTwitterFollowerCounts },
     { platform: 'reddit', fn: scrapeRedditFollowerCounts },
-    { platform: 'threads', fn: scrapeThreadsFollowerCounts },
     { platform: 'pinterest', fn: scrapePinterestFollowerCounts },
   ];
 

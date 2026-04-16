@@ -1,13 +1,19 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   getTemplateWeights,
+  getDefaultWeights,
   pickWeightedTemplate,
   getAllTemplates,
 } from '../src/pipeline/template-weights.js';
 
+// Mock fs so tests always use hardcoded defaults (no learned weights file)
+vi.mock('node:fs', () => ({
+  readFileSync: () => { throw new Error('ENOENT'); },
+}));
+
 describe('getTemplateWeights', () => {
   it('returns weights for all known platforms', () => {
-    const platforms = ['instagram', 'tiktok', 'youtube', 'reddit', 'pinterest', 'twitter', 'threads'];
+    const platforms = ['instagram', 'tiktok', 'youtube', 'reddit', 'pinterest', 'twitter'];
     for (const platform of platforms) {
       const weights = getTemplateWeights(platform);
       expect(weights.length).toBeGreaterThan(0);
@@ -21,7 +27,7 @@ describe('getTemplateWeights', () => {
   });
 
   it('weights sum to approximately 1.0 for each platform', () => {
-    const platforms = ['instagram', 'tiktok', 'youtube', 'reddit', 'pinterest', 'twitter', 'threads'];
+    const platforms = ['instagram', 'tiktok', 'youtube', 'reddit', 'pinterest', 'twitter'];
     for (const platform of platforms) {
       const weights = getTemplateWeights(platform);
       const sum = weights.reduce((acc, [, w]) => acc + w, 0);
@@ -31,7 +37,7 @@ describe('getTemplateWeights', () => {
 
   it('only uses templates from getAllTemplates', () => {
     const allTemplates = getAllTemplates();
-    const platforms = ['instagram', 'tiktok', 'youtube', 'reddit', 'pinterest', 'twitter', 'threads'];
+    const platforms = ['instagram', 'tiktok', 'youtube', 'reddit', 'pinterest', 'twitter'];
     for (const platform of platforms) {
       const weights = getTemplateWeights(platform);
       const templateIds = weights.map(([id]) => id);
@@ -42,13 +48,24 @@ describe('getTemplateWeights', () => {
   });
 
   it('all weights are positive numbers', () => {
-    const platforms = ['instagram', 'tiktok', 'youtube', 'reddit', 'pinterest', 'twitter', 'threads'];
+    const platforms = ['instagram', 'tiktok', 'youtube', 'reddit', 'pinterest', 'twitter'];
     for (const platform of platforms) {
       const weights = getTemplateWeights(platform);
       for (const [name, weight] of weights) {
         expect(weight).toBeGreaterThan(0);
         expect(typeof weight).toBe('number');
       }
+    }
+  });
+});
+
+describe('getDefaultWeights', () => {
+  it('returns weights for all 6 platforms', () => {
+    const defaults = getDefaultWeights();
+    const platforms = ['instagram', 'tiktok', 'youtube', 'reddit', 'pinterest', 'twitter'];
+    for (const platform of platforms) {
+      expect(defaults[platform]).toBeDefined();
+      expect(defaults[platform].length).toBeGreaterThan(0);
     }
   });
 });

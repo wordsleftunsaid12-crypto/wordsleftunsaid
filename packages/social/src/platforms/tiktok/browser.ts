@@ -3,6 +3,7 @@
  * All TikTok browser modules share the same persistent session.
  */
 import { chromium, type BrowserContext, type Page } from 'playwright';
+import { chromiumLaunchOverrides } from '../browser-lock.js';
 import { resolve } from 'node:path';
 import { existsSync, mkdirSync } from 'node:fs';
 
@@ -27,6 +28,7 @@ export async function launchTikTok(): Promise<BrowserSession> {
   }
 
   const context = await chromium.launchPersistentContext(TIKTOK_BROWSER_DATA_DIR, {
+    ...chromiumLaunchOverrides(),
     headless: false,
     viewport: { width: 1280, height: 900 },
     args: ['--disable-blink-features=AutomationControlled'],
@@ -123,6 +125,7 @@ if (isDirectRun) {
   }
 
   const ctx = await chromium.launchPersistentContext(TIKTOK_BROWSER_DATA_DIR, {
+    ...chromiumLaunchOverrides(),
     headless: false,
     viewport: { width: 1280, height: 900 },
     args: ['--disable-blink-features=AutomationControlled'],

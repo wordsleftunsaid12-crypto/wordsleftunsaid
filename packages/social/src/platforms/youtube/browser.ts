@@ -3,6 +3,7 @@
  * All YouTube browser modules share the same persistent session.
  */
 import { chromium, type BrowserContext, type Page } from 'playwright';
+import { chromiumLaunchOverrides } from '../browser-lock.js';
 import { resolve } from 'node:path';
 import { existsSync, mkdirSync } from 'node:fs';
 import { assertNoCaptcha } from '../../utils/captcha.js';
@@ -28,6 +29,7 @@ export async function launchYouTube(): Promise<BrowserSession> {
   }
 
   const context = await chromium.launchPersistentContext(YOUTUBE_BROWSER_DATA_DIR, {
+    ...chromiumLaunchOverrides(),
     headless: false,
     viewport: { width: 1280, height: 900 },
     args: ['--disable-blink-features=AutomationControlled'],
@@ -114,6 +116,7 @@ if (isDirectRun) {
   }
 
   const ctx = await chromium.launchPersistentContext(YOUTUBE_BROWSER_DATA_DIR, {
+    ...chromiumLaunchOverrides(),
     headless: false,
     viewport: { width: 1280, height: 900 },
     args: ['--disable-blink-features=AutomationControlled'],

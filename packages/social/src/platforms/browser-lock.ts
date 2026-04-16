@@ -15,6 +15,18 @@ const locks = new Map<string, Promise<void>>();
 const SINGLETON_FILES = ['SingletonLock', 'SingletonCookie', 'SingletonSocket'] as const;
 
 /**
+ * Extra launch options for Playwright. On hosts where the bundled Chromium
+ * won't run (e.g. macOS 11 Big Sur — missing newer Apple frameworks), set
+ * WLU_BROWSER_CHANNEL=chrome to route through the system-installed Google
+ * Chrome instead. On Apple Silicon/modern macOS, leave it unset.
+ */
+export function chromiumLaunchOverrides(): { channel?: 'chrome' | 'msedge' } {
+  const channel = process.env.WLU_BROWSER_CHANNEL;
+  if (channel === 'chrome' || channel === 'msedge') return { channel };
+  return {};
+}
+
+/**
  * Check if a process with the given PID is running.
  */
 function isProcessAlive(pid: number): boolean {

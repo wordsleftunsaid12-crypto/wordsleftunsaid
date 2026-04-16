@@ -2,6 +2,7 @@
  * Shared Playwright browser utilities for X/Twitter automation.
  */
 import { chromium, type BrowserContext, type Page } from 'playwright';
+import { chromiumLaunchOverrides } from '../browser-lock.js';
 import { resolve } from 'node:path';
 import { existsSync, mkdirSync } from 'node:fs';
 
@@ -24,6 +25,7 @@ export async function launchTwitter(): Promise<BrowserSession> {
   }
 
   const context = await chromium.launchPersistentContext(TWITTER_BROWSER_DATA_DIR, {
+    ...chromiumLaunchOverrides(),
     headless: false,
     viewport: { width: 1280, height: 900 },
     args: ['--disable-blink-features=AutomationControlled'],
@@ -70,6 +72,7 @@ if (isDirectRun) {
   }
 
   const ctx = await chromium.launchPersistentContext(TWITTER_BROWSER_DATA_DIR, {
+    ...chromiumLaunchOverrides(),
     headless: false,
     viewport: { width: 1280, height: 900 },
     args: ['--disable-blink-features=AutomationControlled'],

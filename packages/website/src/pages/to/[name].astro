@@ -1,0 +1,153 @@
+---
+/**
+ * Dynamic route `/to/<name>` — letters addressed to a specific recipient.
+ *
+ * Powers the "search your name" viral mechanic described in the best-practices
+ * research (2026-04-19). Example share: "Someone wrote this to a Sarah. Search
+ * your name at wordsleftunsent.com/to/sarah to see letters to you."
+ *
+ * Each name gets an SEO-indexable landing page. Capitalization in the URL is
+ * preserved for display but matching is case-insensitive in the DB query.
+ */
+import Base from '../../layouts/Base.astro';
+import Header from '../../components/Header.astro';
+import Footer from '../../components/Footer.astro';
+import MessageCard from '../../components/MessageCard.astro';
+import StructuredData from '../../components/StructuredData.astro';
+import { getMessagesByRecipient } from '@wlu/shared';
+
+export const prerender = false; // server-render so fresh messages show up
+
+const { name } = Astro.params;
+const recipientRaw = decodeURIComponent(name ?? '').trim();
+const recipient = recipientRaw.slice(0, 50); // soft cap to avoid abuse
+
+// Display: capitalize first letter of each word for the header
+const displayName = recipient
+  .split(/\s+/)
+  .map((w) => (w.length > 0 ? w[0].toUpperCase() + w.slice(1) : w))
+  .join(' ');
+
+let messages: Awaited<ReturnType<typeof getMessagesByRecipient>> = [];
+let error = '';
+try {
+  messages = await getMessagesByRecipient(recipient, { limit: 40 });
+} catch (e) {
+  error = e instanceof Error ? e.message : 'Failed to search messages';
+}
+
+const hasResults = messages.length > 0;
+const description = hasResults
+  ? `${messages.length} anonymous unsent letters written to ${displayName}.`
+  : `No unsent letters to ${displayName} yet. Be the first to write one.`;
+---
+
+<Base title={`Letters to ${displayName} — Words Left Unsent`} description={description}>
+  <StructuredData data={{
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    name: `Letters to ${displayName}`,
+    description,
+    url: Astro.url.toString(),
+  }} />
+  <Header />
+
+  <main>
+    <section class="search-hero">
+      <h1 class="search-title">
+        Letters to <span class="search-name">{displayName}</span>
+      </h1>
+      <p class="search-sub">
+        {hasResults
+          ? `${messages.length} anonymous message${messages.length === 1 ? '' : 's'} someone wanted ${displayName} to read`
+          : `No one has written to a ${displayName} yet — be the first.`}
+      </p>
+      <div class="search-cta">
+        <a href="/submit" class="btn-primary">Write a letter to {displayName}</a>
+        <a href="/" class="btn-secondary">See all letters</a>
+      </div>
+    </section>
+
+    {error && <p class="error-msg">{error}</p>}
+
+    {hasResults && (
+      <section class="messages-grid">
+        {messages.map((m) => (
+          <MessageCard
+            id={m.id}
+            from={m.from}
+            to={m.to}
+            content={m.content}
+            createdAt={m.created_at}
+            likeCount={m.like_count ?? 0}
+          />
+        ))}
+      </section>
+    )}
+  </main>
+
+  <Footer />
+</Base>
+
+<style>
+  .search-hero {
+    text-align: center;
+    padding: 4rem 1.5rem 3rem;
+    max-width: 720px;
+    margin: 0 auto;
+  }
+  .search-title {
+    font-size: clamp(2rem, 5vw, 3rem);
+    font-weight: 300;
+    margin-bottom: 1rem;
+    color: var(--color-text, #1a1a1a);
+  }
+  .search-name {
+    font-weight: 600;
+    color: var(--color-accent, #8a6d4d);
+  }
+  .search-sub {
+    font-size: 1.05rem;
+    color: var(--color-text-muted, #5c5c5c);
+    margin-bottom: 2rem;
+  }
+  .search-cta {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .btn-primary,
+  .btn-secondary {
+    padding: 0.75rem 1.5rem;
+    border-radius: 999px;
+    text-decoration: none;
+    font-weight: 500;
+    transition: transform 150ms, box-shadow 150ms;
+  }
+  .btn-primary {
+    background: var(--color-accent, #8a6d4d);
+    color: white;
+  }
+  .btn-secondary {
+    border: 1px solid var(--color-text-muted, #5c5c5c);
+    color: var(--color-text, #1a1a1a);
+  }
+  .btn-primary:hover,
+  .btn-secondary:hover {
+    transform: translateY(-1px);
+  }
+  .error-msg {
+    color: crimson;
+    text-align: center;
+    padding: 2rem;
+  }
+  .messages-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1rem;
+    padding: 2rem 1rem;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+</style>

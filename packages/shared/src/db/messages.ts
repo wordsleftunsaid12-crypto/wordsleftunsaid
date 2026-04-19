@@ -105,6 +105,37 @@ export async function approveMessage(id: string): Promise<Message> {
   return data as Message;
 }
 
+/**
+ * Find all approved messages addressed to a given recipient name (case-insensitive).
+ * Powers the `/to/<name>` "search your name" viral-mechanic page.
+ *
+ * Uses ILIKE with exact trimmed match by default — so "Sarah" matches
+ * "sarah", " Sarah ", "SARAH" but not "Sarah's best friend". Set
+ * `fuzzy: true` for a `to ILIKE %name%` substring match.
+ */
+export async function getMessagesByRecipient(
+  recipient: string,
+  opts: { limit?: number; offset?: number; fuzzy?: boolean } = {},
+): Promise<Message[]> {
+  const { limit = DEFAULT_PAGE_SIZE, offset = 0, fuzzy = false } = opts;
+  const trimmed = recipient.trim();
+  if (!trimmed) return [];
+  const client = getAnonClient();
+
+  const pattern = fuzzy ? `%${trimmed}%` : trimmed;
+  const { data, error } = await client
+    .from('messages')
+    .select('*')
+    .eq('approved', true)
+    .ilike('to', pattern)
+    .order('like_count', { ascending: false })
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  if (error) throw new Error(`Failed to fetch messages by recipient: ${error.message}`);
+  return data as Message[];
+}
+
 export async function searchMessages(
   query: string,
   filters: Omit<MessageFilters, 'approved'> = {},

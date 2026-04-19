@@ -276,19 +276,73 @@ const TIKTOK_HOOKS = [
 
 /**
  * Build a full caption with mood-matched template + platform hashtags.
+ *
+ * If `recipient` is a real first-name style value (e.g. "Kat", "mom"),
+ * caption uses the "search your name" viral hook pointing at
+ * wordsleftunsent.com/to/<name> — the #1 growth lever in this niche per
+ * 2026-04-19 research (see reports/best-practices-2026-04-19.md). Falls
+ * back to the generic mood template for abstract/role recipients.
  */
 export function buildCaption(
   mood: MessageMood,
   platform: 'instagram' | 'tiktok' | 'youtube',
+  recipient?: string,
 ): { caption: string; hashtags: string[] } {
-  let caption = pickCaptionTemplate(mood);
-
-  // TikTok: prepend a trending hook format for discovery
-  if (platform === 'tiktok') {
-    const hook = TIKTOK_HOOKS[Math.floor(Math.random() * TIKTOK_HOOKS.length)];
-    caption = `${hook}\n\n${caption}`;
+  let caption: string;
+  const nameHook = buildNameSearchHook(recipient, platform);
+  if (nameHook) {
+    caption = nameHook;
+  } else {
+    caption = pickCaptionTemplate(mood);
+    if (platform === 'tiktok') {
+      const hook = TIKTOK_HOOKS[Math.floor(Math.random() * TIKTOK_HOOKS.length)];
+      caption = `${hook}\n\n${caption}`;
+    }
   }
 
   const hashtags = buildHashtags(platform);
   return { caption, hashtags };
+}
+
+/**
+ * If the recipient looks like a real first name, produce a "search your name"
+ * caption pointing at /to/<name>. Returns null for abstract recipients
+ * ("my pillow", "anyone"), role labels that aren't a specific person, or
+ * empty strings — caller falls back to the generic mood template.
+ *
+ * Keep captions short: research says 138-150 chars is the engagement sweet
+ * spot, first 125 chars must hook.
+ */
+function buildNameSearchHook(
+  recipient: string | undefined,
+  platform: 'instagram' | 'tiktok' | 'youtube',
+): string | null {
+  if (!recipient) return null;
+  const name = recipient.trim();
+  if (!name) return null;
+
+  // Reject abstract / literary recipients — same filter used in the render pipeline
+  const ABSTRACT =
+    /^(3am|day \d+|nobody|anyone|everyone|someone|the (old me|new me|younger me|future me|past me|new day|empty chair|last conversation|person reading this|barista|uber driver|vet|bus \d+|stranger|commuter)|my (pillow|reflection|anxiety|job|worst enemy|journal|diary|closet)|anyone struggling|this website|words left unsaid|your voicemail)$/i;
+  if (ABSTRACT.test(name)) return null;
+
+  // Accept first-names / initials / clear relationships
+  // (1-2 word names, short enough for display, no punctuation-heavy strings)
+  if (name.length > 25 || /[\\/<>]/.test(name)) return null;
+
+  // URL-safe slug: lowercase, underscores for spaces
+  const slug = encodeURIComponent(name.toLowerCase().replace(/\s+/g, ' '));
+  const url = `${CTA_LINK}/to/${slug}`;
+  // Display name: preserve original casing, but limit length
+  const display = name.slice(0, 24);
+
+  // Platform-specific tone delta (research: don't reuse identical captions)
+  if (platform === 'tiktok') {
+    return `someone wrote this to a ${display}. search your name \u2192 ${url}`;
+  }
+  if (platform === 'youtube') {
+    return `An anonymous unsent letter to ${display}. Search your own name at ${url} to see letters written to you.`;
+  }
+  // Instagram: aim for ~140 chars, hook-first
+  return `To ${display} \u2014 someone needed to say this. Search your name \u2192 ${url}`;
 }

@@ -40,6 +40,7 @@ export {
   approveMessage,
   getUnapprovedMessages,
   searchMessages,
+  getMessagesByRecipient,
   likeMessage,
   unlikeMessage,
   markFirstLikeNotified,

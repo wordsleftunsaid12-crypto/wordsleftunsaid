@@ -126,7 +126,14 @@ const iconSize = size === 'lg' ? 20 : 16;
   });
 </script>
 
-<style>
+<style is:global>
+  /*
+   * Global so styles apply to both SSR HeartButton components and the
+   * heart buttons the homepage's infinite-scroll script injects as raw
+   * HTML. Astro scopes per-component by default, which left dynamic
+   * buttons with default browser <button> styling (white background).
+   * Same class of bug as MessageCard (2026-04-20).
+   */
   .heart-btn {
     display: inline-flex;
     align-items: center;

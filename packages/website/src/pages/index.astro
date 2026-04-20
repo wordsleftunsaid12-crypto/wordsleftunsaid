@@ -72,40 +72,6 @@ const hasMore = messages.length === PAGE_SIZE;
       </div>
     </section>
 
-    <!-- Name search — the "search your name" viral mechanic. Anyone can
-         look up letters addressed to a given recipient name. -->
-    <section class="name-search-section fade-in">
-      <div class="container name-search-container">
-        <h2 class="name-search-title">Search letters by recipient</h2>
-        <p class="name-search-sub">Someone might have written to a Sarah, a Jamie, a dad. Find letters addressed to you or someone you know.</p>
-        <form class="name-search-form" id="name-search-form" action="/to/" method="GET">
-          <input
-            type="text"
-            id="name-search-input"
-            class="name-search-input"
-            placeholder="Enter a first name…"
-            aria-label="Recipient name to search"
-            autocomplete="off"
-            maxlength="50"
-          />
-          <button type="submit" class="name-search-btn">Search</button>
-        </form>
-      </div>
-    </section>
-    <script is:inline>
-      (function () {
-        const form = document.getElementById('name-search-form');
-        const input = document.getElementById('name-search-input');
-        if (!form || !input) return;
-        form.addEventListener('submit', (e) => {
-          e.preventDefault();
-          const v = (input.value || '').trim();
-          if (!v) return;
-          window.location.href = '/to/' + encodeURIComponent(v.toLowerCase());
-        });
-      })();
-    </script>
-
     <!-- Messages Feed -->
     <section id="messages" class="messages-section">
       <div class="container">
@@ -125,6 +91,7 @@ const hasMore = messages.length === PAGE_SIZE;
             <input
               type="text"
               name="q"
+              id="main-search-input"
               class="search-input"
               placeholder="Search messages..."
               value={searchQuery}
@@ -134,6 +101,9 @@ const hasMore = messages.length === PAGE_SIZE;
               <a href="/" class="search-clear" aria-label="Clear search">&times;</a>
             )}
           </form>
+          <p class="name-search-hint" id="name-search-hint">
+            Looking for letters to a specific person? <a href="#" id="name-search-link">See letters to <span id="name-search-term"></span> →</a>
+          </p>
         </div>
 
         {error ? (
@@ -204,6 +174,42 @@ const hasMore = messages.length === PAGE_SIZE;
 
   <Footer />
 </Base>
+
+<script is:inline>
+  // Inline name-search hint — shows under the main search bar when the
+  // user has typed something that looks like a single name, offering a
+  // direct link to /to/<name>. Doesn't replace the full-text search,
+  // just surfaces the per-recipient view as an optional shortcut.
+  (function () {
+    const input = document.getElementById('main-search-input');
+    const hint = document.getElementById('name-search-hint');
+    const link = document.getElementById('name-search-link');
+    const term = document.getElementById('name-search-term');
+    if (!input || !hint || !link || !term) return;
+
+    function looksLikeName(v) {
+      const t = v.trim();
+      // Short, word-ish string — not a long content search phrase.
+      return t.length > 0 && t.length <= 25 && /^[\p{L}'\-.\s]+$/u.test(t);
+    }
+
+    function update() {
+      const v = input.value || '';
+      if (looksLikeName(v)) {
+        const display = v.trim();
+        term.textContent = display;
+        link.setAttribute('href', '/to/' + encodeURIComponent(display.toLowerCase()));
+        hint.classList.add('visible');
+      } else {
+        hint.classList.remove('visible');
+      }
+    }
+
+    input.addEventListener('input', update);
+    input.addEventListener('focus', update);
+    update();
+  })();
+</script>
 
 <script>
   // Scroll to the card referenced by the URL hash (e.g. #msg-abc123)
@@ -569,65 +575,26 @@ const hasMore = messages.length === PAGE_SIZE;
 </script>
 
 <style>
-  /* Name search */
-  .name-search-section {
-    padding: var(--space-lg) var(--space-md);
-    text-align: center;
-  }
-  .name-search-container {
-    max-width: 640px;
-    margin: 0 auto;
-  }
-  .name-search-title {
-    font-family: var(--font-serif, 'Lora', serif);
-    font-size: clamp(1.5rem, 3.5vw, 2rem);
-    font-weight: 400;
-    margin: 0 0 0.5rem 0;
-    color: var(--color-text);
-  }
-  .name-search-sub {
+  /* Name-search hint — a compact one-line CTA that appears under the main
+     search bar when the user has typed something. Offers a direct jump to
+     /to/<name> for the "letters addressed to X" viral mechanic. */
+  .name-search-hint {
+    display: none;
+    margin-top: 0.5rem;
+    font-size: 0.875rem;
     color: var(--color-text-muted);
-    font-size: 1rem;
-    margin: 0 auto 1.25rem;
-    max-width: 520px;
-    line-height: 1.5;
+    text-align: left;
   }
-  .name-search-form {
-    display: flex;
-    gap: 0.5rem;
-    max-width: 420px;
-    margin: 0 auto;
-    align-items: stretch;
+  .name-search-hint.visible {
+    display: block;
   }
-  .name-search-input {
-    flex: 1;
-    padding: 0.75rem 1rem;
-    border-radius: 999px;
-    border: 1px solid var(--color-border, rgba(255,255,255,0.15));
-    background: var(--color-surface, rgba(255,255,255,0.04));
-    color: var(--color-text);
-    font: inherit;
-    font-size: 1rem;
-    outline: none;
-    transition: border-color 150ms, background 150ms;
-  }
-  .name-search-input:focus {
-    border-color: var(--color-accent);
-    background: var(--color-surface-hover, rgba(255,255,255,0.08));
-  }
-  .name-search-btn {
-    padding: 0.75rem 1.5rem;
-    border-radius: 999px;
-    border: none;
-    background: var(--color-accent);
-    color: white;
+  .name-search-hint a {
+    color: var(--color-accent);
+    text-decoration: none;
     font-weight: 500;
-    cursor: pointer;
-    font-size: 1rem;
-    transition: transform 150ms, box-shadow 150ms;
   }
-  .name-search-btn:hover {
-    transform: translateY(-1px);
+  .name-search-hint a:hover {
+    text-decoration: underline;
   }
 
   /* Hero */

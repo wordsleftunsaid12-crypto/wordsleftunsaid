@@ -63,7 +63,7 @@ const description = hasResults
           : `No one has written to a ${displayName} yet — be the first.`}
       </p>
       <div class="search-cta">
-        <a href="/submit" class="btn-primary">Write a letter to {displayName}</a>
+        <a href={`/submit?to=${encodeURIComponent(displayName)}`} class="btn-primary">Write a letter to {displayName}</a>
         <a href="/" class="btn-secondary">See all letters</a>
       </div>
     </section>

@@ -17,6 +17,11 @@ let submittedTo = '';
 let submittedFrom = '';
 let submittedContent = '';
 
+// Pre-fill the "to" field when the user arrived from /to/<name>.
+// `?to=Kat` lands them here with Kat pre-populated so they only need
+// to fill from + content.
+const prefillTo = Astro.url.searchParams.get('to')?.trim().slice(0, 25) ?? '';
+
 const formToken = Date.now().toString(36);
 
 if (Astro.request.method === 'POST') {
@@ -270,6 +275,7 @@ if (Astro.request.method === 'POST') {
                   maxlength="25"
                   required
                   class="form-input"
+                  value={prefillTo}
                 />
               </div>
               <div class="form-group">

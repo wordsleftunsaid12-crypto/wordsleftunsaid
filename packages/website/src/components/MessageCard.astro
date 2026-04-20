@@ -83,7 +83,13 @@ function getTimeAgo(date: Date): string {
   });
 </script>
 
-<style>
+<style is:global>
+  /*
+   * Global so the same styles apply to both server-rendered MessageCard
+   * components and dynamically-created cards appended by the homepage's
+   * infinite-scroll script. Astro scopes per-component by default, which
+   * broke dynamic cards (observed 2026-04-20).
+   */
   .card {
     display: block;
     background: rgba(26, 24, 22, 0.6);

@@ -114,32 +114,34 @@ const hasMore = messages.length === PAGE_SIZE;
             <a href="/submit" class="btn-primary">Write a message</a>
           </div>
         ) : (
-          <div
-            class="messages-grid stagger"
-            id="messages-grid"
-            data-offset={messages.length}
-            data-sort={sort}
-            data-q={searchQuery}
-            data-has-more={hasMore ? 'true' : 'false'}
-          >
-            {messages.map((msg) => (
-              <MessageCard
-                id={msg.id}
-                from={msg.from}
-                to={msg.to}
-                content={msg.content}
-                createdAt={msg.created_at}
-                likeCount={msg.like_count}
-              />
-            ))}
-          </div>
-          {hasMore && (
-            <div id="scroll-sentinel" class="scroll-sentinel" aria-hidden="true"></div>
-          )}
-          <div id="scroll-status" class="scroll-status" style={hasMore ? '' : 'display:none'}>
-            <div class="scroll-spinner" id="scroll-spinner"></div>
-            <p class="scroll-end" id="scroll-end" style="display:none">You've read them all</p>
-          </div>
+          <>
+            <div
+              class="messages-grid stagger"
+              id="messages-grid"
+              data-offset={messages.length}
+              data-sort={sort}
+              data-q={searchQuery}
+              data-has-more={hasMore ? 'true' : 'false'}
+            >
+              {messages.map((msg) => (
+                <MessageCard
+                  id={msg.id}
+                  from={msg.from}
+                  to={msg.to}
+                  content={msg.content}
+                  createdAt={msg.created_at}
+                  likeCount={msg.like_count}
+                />
+              ))}
+            </div>
+            {hasMore && (
+              <div id="scroll-sentinel" class="scroll-sentinel" aria-hidden="true"></div>
+            )}
+            <div id="scroll-status" class="scroll-status" style={hasMore ? '' : 'display:none'}>
+              <div class="scroll-spinner" id="scroll-spinner"></div>
+              <p class="scroll-end" id="scroll-end" style="display:none">You've read them all</p>
+            </div>
+          </>
         )}
       </div>
       <canvas id="particles" class="particles-canvas" aria-hidden="true"></canvas>
